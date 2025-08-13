@@ -1,0 +1,105 @@
+# Git
+
+## 一、如何上传自己的项目到Gitee
+
+### 1、在项目目录右键点击Git Bash Here，执行以下代码
+
+```powershell
+git init
+```
+
+### 2、配置用户名与邮箱
+
+用户名：
+
+```bash
+git config --global user.name 'your name' 
+```
+
+邮箱：
+
+```bash
+git config --global user.email 'your email'
+```
+
+### 3、连接项目路径
+
+```bash
+git remote set-url origin 项目路径
+```
+
+```bash
+git remote add origin 项目路径
+```
+
+### 4、按顺序执行以下命令
+
+```bash
+git pull origin master
+```
+
+```bash
+git add .
+```
+
+```bash
+git commit -m '你的项目说明'
+```
+
+```bash
+git push origin master
+```
+
+### 5、输入验证信息
+
+你的用户名以及令牌
+
+## 二、常用命令
+
+### 1、查看仓库状态
+
+```bash
+git statue
+```
+
+### 2、将文件存储到暂存区
+
+```bash
+git add 文件名
+git add .    #存储所有文件
+```
+
+### 3、删除文件
+
+```bash
+git rm 文件  #删除暂存区与工作区文件
+git rm --cache 文件  #删除暂存区文件
+#可使用git commit 更新删除文件
+```
+
+### 4、查看日志
+
+```bash
+git log --online #提交日志
+git reflog --online #操作日志（提交与回退日志）
+```
+
+### 5、回退
+
+```bash
+#版本id可由git log 获取
+git reset --soft  版本id #只回退在线仓库，暂存区与工作区不变
+git reset --hard  版本id #回退三个仓库的版本 
+git reset --mixed 版本id #只保留工作区
+```
+
+### 6、分支
+
+```bash
+git brach 分支名       #新建分支
+git checkout/switch 分支名    #切换分支
+git merge 分支名       #将分支名的分支合并到目前分支，合并若冲突可以通过git statue和git diff定位冲突内容
+git rebase 分支名      #将分支名的分支合并到目前分支，通常不在主分支执行该命令
+git brach -d(D) 分支名 #d删除分支(已合并)，D强制删除分支(未合并)
+```
+
