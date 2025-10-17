@@ -1,6 +1,6 @@
-Java Stream流写法
+# Java Stream流写法
 
-1、一般用法
+## 1、一般用法
 
 ```java
 Integer nums[] = new Integer[]{1,2,3,4,5,6,7};
@@ -21,7 +21,7 @@ System.out.println(numList);
 [1, 2, 3, 4, 5, 6, 7]
 ```
 
-2、获取指定元素
+## 2、获取指定元素
 
 ```java
 #初始化类
@@ -63,13 +63,13 @@ List<User> users = new ArrayList<>();
 Set<Integer> set = nums.stream().map(i -> i.getId()).collect(Collectors.toSet());
 ```
 
-3、收集为自定义对象（以LinkedList为例）
+## 3、收集为自定义对象（以LinkedList为例）
 
 ```java
 LinkedList<Integer> linkedList = nums.stream().map(i -> i.getId()).collect(Collectors.toCollection(LinkedList::new));
 ```
 
-4、调用构造函数用法
+## 4、调用构造函数用法
 
 ```
 
