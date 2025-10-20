@@ -2637,9 +2637,242 @@ void someFunction() {
 
 ## 9、Lambda表达式
 
+C++ Lambda 表达式是 C++11 引入的匿名函数机制，旨在简化代码中短小函数的定义与使用，尤其适合作为算法的谓词（predicate）或回调函数。它的核心优势是**无需单独定义函数名**，可直接在需要的地方内联编写，使代码更紧凑、逻辑更清晰。
 
+### （1）基本语法
 
+Lambda 表达式的完整语法结构如下：
 
+```
+[捕获列表](参数列表) mutable(可选) noexcept(可选) -> 返回类型(可选) { 函数体 }
+```
+
+各部分的作用：
+
+- **捕获列表**：控制 Lambda 与外部作用域变量的交互（如值传递、引用传递）。
+
+- **参数列表**：与普通函数的参数列表类似，可省略（无参数时）。
+
+- **mutable**：可选关键字，允许修改值捕获的变量（默认值捕获变量为const）。
+
+- **noexcept**：可选说明符，表示 Lambda 不会抛出异常（用于优化）。
+
+- **返回类型**：可选，若函数体仅有一个return语句，编译器可自动推导，否则需显式指定。
+
+- **函数体**：Lambda 的执行逻辑，与普通函数体一致。
+
+### （2）核心部分详解
+
+#### 1. 捕获列表（关键）
+
+捕获列表用于指定 Lambda 如何访问外部作用域的变量，是 Lambda 与外部交互的核心。常见形式如下：
+
+| 捕获方式    | 说明                                                         |
+| ----------- | ------------------------------------------------------------ |
+| []          | 不捕获任何外部变量                                           |
+| [x]         | **值捕获**：复制变量x的副本（Lambda 内修改不影响外部）       |
+| [&x]        | **引用捕获**：引用变量x（Lambda 内修改会影响外部）           |
+| [=]         | **隐式值捕获**：值捕获所有 Lambda 中使用的外部变量           |
+| [&]         | **隐式引用捕获**：引用捕获所有 Lambda 中使用的外部变量       |
+| [=, &x]     | 除x用引用捕获外，其余变量隐式值捕获（&x需放在=后）           |
+| [&, x]      | 除x用值捕获外，其余变量隐式引用捕获（x需放在&后）            |
+| [this]      | 捕获当前类的this指针（类成员函数中使用，可访问成员变量 / 函数） |
+| [y = x + 1] | **初始化捕获**（C++14）：捕获表达式x+1的结果，命名为y（副本） |
+| [*this]     | 复制捕获当前对象（C++20）：避免this指针悬垂（如返回 Lambda 时） |
+
+**示例：捕获方式对比**
+
+```
+#include <iostream>
+using namespace std;
+
+int main() {
+    int a = 10, b = 20;
+
+    // 1. 不捕获任何变量
+    auto f1 = []() { cout << "无捕获" << endl; };
+    f1(); // 输出：无捕获
+
+    // 2. 值捕获a，引用捕获b
+    auto f2 = [a, &b]() { 
+        // a = 30; // 错误：值捕获变量默认是const（需加mutable）
+        b = 30;   // 引用捕获可修改
+        cout << "a=" << a << ", b=" << b << endl; 
+    };
+    f2(); // 输出：a=10, b=30（外部b已被修改）
+    cout << "外部b=" << b << endl; // 输出：外部b=30
+
+    // 3. 隐式值捕获所有使用的变量（此处为a）
+    auto f3 = [=]() { cout << "隐式值捕获a=" << a << endl; };
+    a = 100; // 外部修改不影响Lambda内的副本
+    f3(); // 输出：隐式值捕获a=10
+
+    // 4. 初始化捕获（C++14）：捕获a+b的结果，命名为sum
+    auto f4 = [sum = a + b]() { cout << "sum=" << sum << endl; };
+    f4(); // 输出：sum=130（a=100, b=30）
+
+    return 0;
+}
+```
+
+#### 2. 参数列表
+
+与普通函数的参数列表规则基本一致，支持类型推导（C++14 起）：
+
+- 无参数时可省略（如[] { ... }）。
+
+- C++14 起支持**泛型参数**（auto），此时 Lambda 会被推导为带模板的闭包类型。
+
+**示例：泛型 Lambda（C++14）**
+
+```
+// 泛型Lambda：支持任意类型的参数a和b
+auto add = [](auto a, auto b) { return a + b; };
+cout << add(1, 2) << endl;       // 输出：3（int）
+cout << add(1.5, 2.5) << endl;   // 输出：4.0（double）
+cout << add("hello", " world") << endl; // 输出：hello world（const char*）
+```
+
+#### 3. mutable 关键字
+
+默认情况下，**值捕获的变量在 Lambda 内是****const****的，不可修改**。若需修改值捕获的变量，需加mutable（但修改仅影响副本，不影响外部变量）。
+
+**示例：mutable 的作用**
+
+```
+int x = 5;
+// 不加mutable：值捕获的x是const，无法修改
+// auto f = [x]() { x++; }; // 错误
+
+// 加mutable：允许修改值捕获的副本
+auto f = [x]() mutable { 
+    x++; 
+    return x; 
+};
+cout << f() << endl; // 输出：6（副本被修改）
+cout << x << endl;   // 输出：5（外部x不变）
+```
+
+#### 4. 返回类型
+
+若函数体仅有一个return语句，编译器可自动推导返回类型，此时-> 返回类型可省略；若有多个return语句或类型复杂，需显式指定。
+
+**示例：返回类型推导与显式指定**
+
+```
+// 单个return：自动推导为int
+auto f1 = []() { return 10; };
+
+// 多个return，类型不同：需显式指定返回类型
+auto f2 = []() -> double { 
+    if (true) return 1; 
+    else return 2.5; 
+};
+cout << f2() << endl; // 输出：1.0（double）
+```
+
+### （3）Lambda 的类型与存储
+
+Lambda 表达式的类型是**匿名的闭包类型（closure type）**，每个 Lambda 的类型唯一，无法直接通过类型名声明变量。但可通过以下方式存储或传递：
+
+- 用auto自动推导（推荐，效率最高）。
+
+- 用std::function（需包含<functional>）存储（适合作为函数参数或容器元素）。
+
+**示例：Lambda 的存储与传递**
+
+```
+#include <functional>
+#include <vector>
+
+// 用std::function接收Lambda
+void callFunc(std::function<void()> func) {
+    func();
+}
+
+int main() {
+    // 1. auto存储Lambda
+    auto print = []() { cout << "Lambda" << endl; };
+    print(); // 输出：Lambda
+
+    // 2. 存储到std::function容器
+    std::vector<std::function<int(int)>> funcs;
+    funcs.push_back([](int x) { return x * 2; });
+    funcs.push_back([](int x) { return x + 10; });
+    cout << funcs[0](5) << endl; // 输出：10
+    cout << funcs[1](5) << endl; // 输出：15
+
+    // 3. 作为参数传递
+    callFunc([]() { cout << "作为参数" << endl; }); // 输出：作为参数
+
+    return 0;
+}
+```
+
+### （4）C++ 版本对 Lambda 的扩展
+
+Lambda 在后续 C++ 标准中不断增强：
+
+- **C++14**：支持泛型参数（auto）、初始化捕获（[y = x + 1]）。
+
+- **C++17**：支持constexpr Lambda（可在编译期执行）、Lambda 捕获*this（复制当前对象）。
+
+- **C++20**：支持模板 Lambda（显式模板参数，如[]<typename T>(T t) { ... }）、Lambda 作为非类型模板参数。
+
+**示例：constexpr Lambda（C++17）**
+
+```
+// constexpr Lambda：可在编译期计算
+constexpr auto square = [](int x) { return x * x; };
+constexpr int s = square(5); // 编译期计算，s=25（无需运行时开销）
+cout << s << endl; // 输出：25
+```
+
+### （5）常见使用场景
+
+Lambda 最常用于简化 STL 算法的谓词或操作：
+
+- 排序（std::sort）、遍历（std::for_each）、查找（std::find_if）等。
+
+**示例：STL 算法中使用 Lambda**
+
+```
+#include <vector>
+#include <algorithm>
+
+int main() {
+    std::vector<int> v = {3, 1, 4, 1, 5};
+
+    // 1. 排序：降序（默认是升序）
+    std::sort(v.begin(), v.end(), [](int a, int b) { return a > b; });
+    // 此时v = {5,4,3,1,1}
+
+    // 2. 遍历：打印所有元素
+    std::for_each(v.begin(), v.end(), [](int x) { cout << x << " "; });
+    // 输出：5 4 3 1 1 
+
+    // 3. 查找：第一个大于3的元素
+    auto it = std::find_if(v.begin(), v.end(), [](int x) { return x > 3; });
+    if (it != v.end()) cout << "\n找到：" << *it << endl; // 输出：找到：5
+
+    return 0;
+}
+```
+
+### （6）注意事项
+
+1. **引用捕获的生命周期**：若 Lambda 的生命周期超过引用捕获变量的生命周期，会导致悬垂引用（未定义行为）。
+
+```
+auto badFunc() {
+    int x = 10;
+    return [&x]() { return x; }; // 错误：x在函数返回后销毁，Lambda引用无效
+}
+```
+
+1. **重复捕获**：同一变量不能被重复捕获（如[x, x]是错误的）。
+
+1. **默认参数**：Lambda 不支持默认参数（如[](int x = 0) { ... }是错误的）。
 
 # 四、常用库函数
 
@@ -3407,4 +3640,1086 @@ std::unordered_map<MyKey, std::string, MyKeyHash, MyKeyEqual> myMap;
 ### （2）队列`queue`
 
 ### （3）优先队列`priority_queue`
+
+## 2、Algorithm
+
+C++ 标准库中的 <algorithm> 头文件是容器操作的 “瑞士军刀”，提供了大量通用算法，用于处理容器中的元素（如查找、排序、修改、转换等）。这些算法基于迭代器工作，与具体容器类型无关（只要容器提供符合要求的迭代器），因此具有极强的通用性和复用性。
+
+### 核心特点
+
+1. **基于迭代器**：算法通过迭代器操作元素，无需关心底层容器（如 vector、list、array 等），只需迭代器满足算法要求（如输入迭代器、随机访问迭代器等）。
+
+1. **范围约定**：几乎所有算法的参数都采用 **[first, last)** 左闭右开区间，表示操作的元素范围（即从 first 指向的元素开始，到 last 指向的元素前结束）。
+
+1. **不修改容器结构**：算法仅操作元素的值或位置，不会直接增加 / 删除容器元素（若需修改容器大小，需配合插入迭代器如 back_inserter）。
+
+1. **可定制行为**：许多算法支持通过 “谓词”（predicate，即返回 bool 的函数 /lambda）自定义逻辑（如比较、过滤条件）。
+
+### （1）非修改性序列操作（仅查询 / 遍历，不改变元素）
+
+这类算法仅读取元素，不修改容器内容，适用于查询、统计、遍历等场景。
+
+| 函数                           | 功能描述                                                     |
+| ------------------------------ | ------------------------------------------------------------ |
+| for_each                       | 对范围 [first, last) 中的每个元素执行指定函数（如打印、计算）。 |
+| count                          | 统计范围中等于 value 的元素个数。                            |
+| count_if                       | 统计范围中满足一元谓词 pred 的元素个数（如统计偶数：count_if(v.begin(), v.end(), [](int x){return x%2==0;})）。 |
+| find                           | 查找范围中第一个等于 value 的元素，返回其迭代器（未找到返回 last）。 |
+| find_if                        | 查找范围中第一个满足一元谓词 pred 的元素（如查找第一个大于 10 的元素）。 |
+| find_end                       | 在范围中查找子序列 [s_first, s_last) 最后一次出现的位置。    |
+| search                         | 在范围中查找子序列 [s_first, s_last) 第一次出现的位置。      |
+| equal                          | 判断两个范围 [first1, last1) 和 [first2, first2 + (last1-first1)) 是否所有元素相等（可自定义比较函数）。 |
+| all_of/any_of/none_of（C++11） | 检查范围中是否**所有元素**满足 pred / **任一元素**满足 pred / **无元素**满足 pred。 |
+
+非修改性序列操作的核心是 “只读不修改”，主要用于查询、统计、遍历等场景。以下是这类操作中常用函数的具体用法示例，每个示例都包含代码实现和效果说明：
+
+#### a. for_each
+
+**功能**：对范围 [first, last) 中的每个元素执行指定函数（可自定义操作，如打印、累加等）。
+
+**示例**：遍历打印元素 + 计算总和
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {1, 2, 3, 4, 5};
+    
+    // 1. 打印每个元素（用lambda表达式）
+    std::cout << "元素列表：";
+    std::for_each(nums.begin(), nums.end(), 
+        [](int x) { std::cout << x << " "; });  // 输出：1 2 3 4 5
+    
+    // 2. 计算总和（用外部变量捕获）
+    int sum = 0;
+    std::for_each(nums.begin(), nums.end(), 
+        [&sum](int x) { sum += x; });  // 累加每个元素到sum
+    std::cout << "\n总和：" << sum;  // 输出：15
+    
+    return 0;
+}
+```
+
+#### b. count
+
+**功能**：统计范围中**等于** **value** 的元素个数。
+
+**示例**：统计 vector 中 “3” 出现的次数
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {3, 1, 3, 5, 3, 7};
+    int target = 3;
+    
+    // 统计等于3的元素个数
+    int cnt = std::count(nums.begin(), nums.end(), target);
+    std::cout << "数字" << target << "出现的次数：" << cnt;  // 输出：3
+    
+    return 0;
+}
+```
+
+#### c. count_if
+
+**功能**：统计范围中**满足一元谓词** **pred** 的元素个数（比 count 更灵活，支持自定义条件）。
+
+**示例**：统计偶数的个数
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {1, 2, 3, 4, 5, 6};
+    
+    // 统计偶数（谓词：x % 2 == 0）
+    int even_cnt = std::count_if(nums.begin(), nums.end(),
+        [](int x) { return x % 2 == 0; });  // 2、4、6是偶数
+    
+    std::cout << "偶数的个数：" << even_cnt;  // 输出：3
+    
+    return 0;
+}
+```
+
+#### d. find
+
+**功能**：查找范围中**第一个等于** **value** 的元素，返回其迭代器（未找到返回 last）。
+
+**示例**：查找第一个 “5” 的位置
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {2, 4, 5, 7, 5};
+    int target = 5;
+    
+    // 查找第一个等于5的元素
+    auto it = std::find(nums.begin(), nums.end(), target);
+    
+    if (it != nums.end()) {
+        // 计算索引（距离begin的偏移量）
+        int index = std::distance(nums.begin(), it);
+        std::cout << "第一个" << target << "在索引" << index << "处";  // 输出：索引2
+    } else {
+        std::cout << "未找到" << target;
+    }
+    
+    return 0;
+}
+```
+
+#### e. find_if
+
+**功能**：查找范围中**第一个满足一元谓词** **pred** 的元素（支持自定义查找条件）。
+
+**示例**：查找第一个大于 10 的元素
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {5, 8, 12, 3, 15};
+    
+    // 查找第一个大于10的元素（谓词：x > 10）
+    auto it = std::find_if(nums.begin(), nums.end(),
+        [](int x) { return x > 10; });
+    
+    if (it != nums.end()) {
+        std::cout << "第一个大于10的元素是：" << *it;  // 输出：12
+    } else {
+        std::cout << "没有大于10的元素";
+    }
+    
+    return 0;
+}
+```
+
+#### f. find_end
+
+**功能**：在主范围中查找**子序列最后一次出现**的位置（返回子序列第一个元素的迭代器）。
+
+**示例**：查找子序列 [3,4] 最后一次出现的位置
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> main_seq = {1, 3, 4, 2, 3, 4, 5};  // 主序列
+    std::vector<int> sub_seq = {3, 4};  // 子序列
+    
+    // 查找子序列最后一次出现的位置
+    auto it = std::find_end(main_seq.begin(), main_seq.end(),
+                            sub_seq.begin(), sub_seq.end());
+    
+    if (it != main_seq.end()) {
+        int index = std::distance(main_seq.begin(), it);
+        std::cout << "子序列最后一次出现在索引" << index << "处";  // 输出：索引4（对应元素3）
+    } else {
+        std::cout << "未找到子序列";
+    }
+    
+    return 0;
+}
+```
+
+#### g. search
+
+**功能**：在主范围中查找**子序列第一次出现**的位置（与 find_end 相反）。
+
+**示例**：查找子序列 [3,4] 第一次出现的位置
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> main_seq = {1, 3, 4, 2, 3, 4, 5};
+    std::vector<int> sub_seq = {3, 4};
+    
+    // 查找子序列第一次出现的位置
+    auto it = std::search(main_seq.begin(), main_seq.end(),
+                          sub_seq.begin(), sub_seq.end());
+    
+    if (it != main_seq.end()) {
+        int index = std::distance(main_seq.begin(), it);
+        std::cout << "子序列第一次出现在索引" << index << "处";  // 输出：索引1（对应元素3）
+    } else {
+        std::cout << "未找到子序列";
+    }
+    
+    return 0;
+}
+```
+
+#### h. equal
+
+**功能**：判断两个范围是否**所有元素都相等**（可自定义比较函数）。
+
+**示例**：比较两个 vector 是否相等 + 自定义比较（忽略大小写）
+
+```
+#include <algorithm>
+#include <vector>
+#include <string>
+#include <cctype>  // 用于tolower
+#include <iostream>
+
+int main() {
+    // 示例1：比较整数vector
+    std::vector<int> a = {1, 2, 3};
+    std::vector<int> b = {1, 2, 3};
+    std::vector<int> c = {1, 2, 4};
+    
+    bool a_eq_b = std::equal(a.begin(), a.end(), b.begin());  // true
+    bool a_eq_c = std::equal(a.begin(), a.end(), c.begin());  // false
+    std::cout << "a与b是否相等：" << std::boolalpha << a_eq_b << "\n";  // true
+    std::cout << "a与c是否相等：" << a_eq_c << "\n";  // false
+    
+    // 示例2：自定义比较（字符串忽略大小写）
+    std::string s1 = "Hello";
+    std::string s2 = "hElLo";
+    // 自定义谓词：转换为小写后比较
+    bool str_eq = std::equal(s1.begin(), s1.end(), s2.begin(),
+        [](char c1, char c2) { 
+            return std::tolower(c1) == std::tolower(c2); 
+        });
+    std::cout << "字符串忽略大小写是否相等：" << str_eq;  // true
+    
+    return 0;
+}
+```
+
+#### i. all_of / any_of / none_of（C++11）
+
+- all_of：检查**所有元素**是否满足谓词；
+
+- any_of：检查**任一元素**是否满足谓词；
+
+- none_of：检查**没有元素**满足谓词。
+
+**示例**：检查数组的元素特性
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {2, 4, 6, 8};  // 全是偶数、正数
+    
+    // 1. 所有元素都是偶数吗？
+    bool all_even = std::all_of(nums.begin(), nums.end(),
+        [](int x) { return x % 2 == 0; });  // true
+    std::cout << "所有元素都是偶数：" << std::boolalpha << all_even << "\n";  // true
+    
+    // 2. 存在元素大于10吗？
+    bool has_gt10 = std::any_of(nums.begin(), nums.end(),
+        [](int x) { return x > 10; });  // false（最大是8）
+    std::cout << "存在大于10的元素：" << has_gt10 << "\n";  // false
+    
+    // 3. 没有元素是负数吗？
+    bool none_negative = std::none_of(nums.begin(), nums.end(),
+        [](int x) { return x < 0; });  // true（全是正数）
+    std::cout << "没有负数：" << none_negative;  // true
+    
+    return 0;
+}
+```
+
+#### 总结
+
+非修改性序列操作的核心是 “只读”，通过迭代器访问元素并执行查询逻辑。使用时需注意：
+
+- 范围均为 [first, last) 左闭右开区间；
+
+- 未找到元素时，find/find_if/find_end/search 均返回 last；
+
+- 自定义谓词（lambda / 函数）需保证无副作用（相同输入返回相同结果）。
+
+### （2）修改性序列操作（修改元素值或位置）
+
+这类算法会修改元素的值、位置或复制到其他容器，适用于转换、替换、复制等场景。
+
+| 函数             | 功能描述                                                     |
+| ---------------- | ------------------------------------------------------------ |
+| copy             | 将范围 [first, last) 中的元素复制到 [dest, ...)（需确保目标有足够空间，或用 back_inserter 自动插入）。 |
+| copy_if（C++11） | 复制范围中满足 pred 的元素到目标范围。                       |
+| move（C++11）    | 将范围中元素 “移动” 到目标范围（源元素会变为 “可析构状态”，避免复制开销）。 |
+| swap_ranges      | 交换两个范围 [first1, last1) 和 [first2, first2 + (last1-first1)) 中的元素。 |
+| transform        | 对范围元素应用函数（或二元操作），结果存入目标范围（如 transform(v.begin(), v.end(), v.begin(), [](int x){return x*2;}) 实现所有元素乘 2）。 |
+| replace          | 将范围中等于 old_val 的元素替换为 new_val。                  |
+| replace_if       | 将范围中满足 pred 的元素替换为 new_val（如替换所有负数为 0）。 |
+| fill             | 将范围中所有元素设为 value（如 fill(v.begin(), v.end(), 0) 清空容器）。 |
+| generate         | 用函数 gen 的返回值填充范围（如 generate(v.begin(), v.end(), rand) 生成随机数）。 |
+
+修改性序列操作的核心是 “修改元素值或位置”（但不直接改变容器的大小，除非配合插入迭代器），主要用于复制、转换、替换、填充等场景。以下是这类操作中常用函数的具体用法示例，包含代码实现和关键说明：
+
+#### a. copy
+
+**功能**：将范围 [first, last) 中的元素**复制**到目标范围 [dest, ...)（需确保目标有足够空间，或用 back_inserter 自动插入）。
+
+**示例**：复制 vector 元素到另一个容器
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> src = {1, 2, 3, 4};
+    std::vector<int> dest1(src.size());  // 提前分配与src相同的空间
+    std::vector<int> dest2;  // 空容器，需用back_inserter自动插入
+    
+    // 1. 复制到已分配空间的dest1（直接用迭代器）
+    std::copy(src.begin(), src.end(), dest1.begin());
+    // 2. 复制到空容器dest2（用back_inserter自动扩容）
+    std::copy(src.begin(), src.end(), std::back_inserter(dest2));
+    
+    // 输出结果
+    std::cout << "dest1: ";
+    for (int x : dest1) std::cout << x << " ";  // 1 2 3 4
+    std::cout << "\ndest2: ";
+    for (int x : dest2) std::cout << x << " ";  // 1 2 3 4
+    
+    return 0;
+}
+```
+
+**关键**：若目标容器未提前分配空间，必须用 std::back_inserter（或 front_inserter/inserter）避免越界。
+
+#### b. copy_if（C++11）
+
+**功能**：仅复制范围中**满足一元谓词** **pred** 的元素到目标范围（条件复制）。
+
+**示例**：复制所有偶数到新容器
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> src = {1, 2, 3, 4, 5, 6};
+    std::vector<int> dest;
+    
+    // 复制满足“x是偶数”的元素到dest
+    std::copy_if(src.begin(), src.end(), std::back_inserter(dest),
+        [](int x) { return x % 2 == 0; });  // 筛选2、4、6
+    
+    std::cout << "复制的偶数：";
+    for (int x : dest) std::cout << x << " ";  // 2 4 6
+    
+    return 0;
+}
+```
+
+#### c. move（C++11）
+
+**功能**：将范围 [first, last) 中的元素**移动**到目标范围（源元素会变为 “可析构状态”，避免复制开销，适合大型对象）。
+
+**示例**：移动字符串 vector 的元素
+
+```
+#include <algorithm>
+#include <vector>
+#include <string>
+#include <iostream>
+
+int main() {
+    std::vector<std::string> src = {"apple", "banana", "cherry"};
+    std::vector<std::string> dest;
+    
+    // 移动src的元素到dest（src会变为空或元素处于可析构状态）
+    std::move(src.begin(), src.end(), std::back_inserter(dest));
+    
+    std::cout << "dest中的元素：";
+    for (const auto& s : dest) std::cout << s << " ";  // apple banana cherry
+    std::cout << "\nsrc的大小（移动后）：" << src.size();  // 3（大小不变，但元素已失效）
+    std::cout << "\nsrc的第一个元素（失效）：" << src[0];  // 未定义（可能为空）
+    
+    return 0;
+}
+```
+
+**关键**：移动后源容器的元素不应再使用（虽大小不变，但内容已被 “取走”）。
+
+#### d. swap_ranges
+
+**功能**：交换两个范围 [first1, last1) 和 [first2, first2 + (last1-first1)) 中的元素（两个范围需等长）。
+
+**示例**：交换两个 vector 的前 3 个元素
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> a = {1, 2, 3, 4};
+    std::vector<int> b = {10, 20, 30, 40};
+    
+    // 交换a和b的前3个元素（范围长度为3）
+    std::swap_ranges(a.begin(), a.begin() + 3, b.begin());
+    
+    std::cout << "a: ";
+    for (int x : a) std::cout << x << " ";  // 10 20 30 4
+    std::cout << "\nb: ";
+    for (int x : b) std::cout << x << " ";  // 1 2 3 40
+    
+    return 0;
+}
+```
+
+#### e. transform
+
+**功能**：对范围元素应用函数（或二元操作），结果存入目标范围（支持 “一元转换” 或 “二元合并”）。
+
+**示例**：一元转换（所有元素乘 2）+ 二元合并（两数组元素相加）
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    // 示例1：一元转换（原地修改）
+    std::vector<int> nums = {1, 2, 3};
+    std::transform(nums.begin(), nums.end(), nums.begin(),
+        [](int x) { return x * 2; });  // 每个元素乘2
+    std::cout << "一元转换后：";
+    for (int x : nums) std::cout << x << " ";  // 2 4 6
+    
+    // 示例2：二元合并（a[i] + b[i] 存入c[i]）
+    std::vector<int> a = {1, 2, 3};
+    std::vector<int> b = {10, 20, 30};
+    std::vector<int> c(3);  // 提前分配空间
+    std::transform(a.begin(), a.end(), b.begin(), c.begin(),
+        [](int x, int y) { return x + y; });  // 对应元素相加
+    std::cout << "\n二元合并后：";
+    for (int x : c) std::cout << x << " ";  // 11 22 33
+    
+    return 0;
+}
+```
+
+#### f. replace
+
+**功能**：将范围中**等于** **old_val** 的元素替换为 new_val（原地修改）。
+
+**示例**：替换所有 “0” 为 “-1”
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {0, 2, 0, 4, 0};
+    
+    // 替换所有0为-1
+    std::replace(nums.begin(), nums.end(), 0, -1);
+    
+    std::cout << "替换后：";
+    for (int x : nums) std::cout << x << " ";  // -1 2 -1 4 -1
+    
+    return 0;
+}
+```
+
+#### g. replace_if
+
+**功能**：将范围中**满足一元谓词** **pred** 的元素替换为 new_val（条件替换）。
+
+**示例**：替换所有负数为 0
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {-1, 2, -3, 4, -5};
+    
+    // 替换所有负数（x < 0）为0
+    std::replace_if(nums.begin(), nums.end(),
+        [](int x) { return x < 0; }, 0);
+    
+    std::cout << "替换后：";
+    for (int x : nums) std::cout << x << " ";  // 0 2 0 4 0
+    
+    return 0;
+}
+```
+
+#### h. fill
+
+**功能**：将范围中**所有元素**设置为 value（批量赋值）。
+
+**示例**：将 vector 的前 3 个元素填充为 9
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums(5);  // 初始化5个元素（默认0）
+    
+    // 填充前3个元素为9
+    std::fill(nums.begin(), nums.begin() + 3, 9);
+    
+    std::cout << "填充后：";
+    for (int x : nums) std::cout << x << " ";  // 9 9 9 0 0
+    
+    return 0;
+}
+```
+
+#### i. generate
+
+**功能**：用函数 gen 的返回值**填充范围**（适合生成有规律的序列，如随机数、自增序列）。
+
+**示例**：生成自增序列和随机数
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+#include <cstdlib>  // rand
+#include <ctime>    // time
+
+int main() {
+    // 示例1：生成自增序列（从1开始）
+    std::vector<int> seq(5);
+    int n = 1;
+    std::generate(seq.begin(), seq.end(),
+        [&n]() { return n++; });  // 每次调用返回n并自增
+    std::cout << "自增序列：";
+    for (int x : seq) std::cout << x << " ";  // 1 2 3 4 5
+    
+    // 示例2：生成随机数（1-100）
+    std::vector<int> rand_nums(3);
+    std::srand(std::time(0));  // 随机数种子
+    std::generate(rand_nums.begin(), rand_nums.end(),
+        []() { return rand() % 100 + 1; });  // 1-100的随机数
+    std::cout << "\n随机数：";
+    for (int x : rand_nums) std::cout << x << " ";  // 如：35 72 18（每次运行不同）
+    
+    return 0;
+}
+```
+
+#### 总结
+
+修改性序列操作的核心是 “改变元素”，使用时需注意：
+
+- 目标范围的空间：copy、transform 等需确保目标有足够空间（或用 back_inserter 自动插入）；
+
+- 原地修改 vs 复制：replace、fill 是原地修改，copy、move 是复制 / 移动到其他容器；
+
+- 移动后的源元素：std::move 后源元素应视为 “无效”，避免再次使用；
+
+- 谓词的灵活性：copy_if、replace_if 等通过谓词支持自定义条件，大幅提升复用性。
+
+### （3）排序及相关操作（针对有序 / 无序范围）
+
+排序是 <algorithm> 中最核心的功能之一，这类算法依赖随机访问迭代器（因此仅支持 vector、array、deque 等，list 需用自身的 sort 成员函数）。
+
+| 函数          | 功能描述                                                     |
+| ------------- | ------------------------------------------------------------ |
+| sort          | 对范围 [first, last) 进行**不稳定排序**（默认升序，可自定义比较函数 comp）。 |
+| stable_sort   | 对范围进行**稳定排序**（相等元素的相对顺序保持不变）。       |
+| partial_sort  | 对范围部分排序：使前 n 个元素为范围中最小的 n 个，且已排序（其余元素无序）。 |
+| nth_element   | 使范围中第 n 个元素（n 从 0 开始）处于 “正确位置”（左边元素 ≤ 它，右边元素 ≥ 它），常用于快速找中位数。 |
+| lower_bound   | 在**已排序范围**中查找第一个 ≥ value 的元素（返回迭代器）。  |
+| upper_bound   | 在**已排序范围**中查找第一个 > value 的元素（返回迭代器）。  |
+| binary_search | 检查**已排序范围**中是否存在 value（返回 bool）。            |
+| merge         | 合并两个**已排序范围**为一个新的有序范围（需目标范围足够大）。 |
+
+排序及相关操作的核心是 “对元素进行排序或基于有序范围做高效查询 / 处理”，这类算法大多依赖**随机访问迭代器**（仅支持 vector、array、deque 等，list 需用自身 sort 成员函数），且二分查找、合并等操作必须基于 “已排序范围” 才能保证正确性。以下是常用函数的具体用法示例：
+
+#### ①排序核心函数（无序→有序）
+
+##### a. sort
+
+`std::sort` 的核心目标是**高效排序**（平均时间复杂度 O (n log n)），但**不保证稳定性**。主流实现采用 **内省排序（Introsort）**，这是一种混合算法，结合了三种排序的优势：
+
+- **快速排序（Quicksort）**：作为基础算法，因为它在平均情况下效率极高（缓存友好、常数因子小）。
+- **堆排序（Heapsort）**：当快速排序的递归深度超过阈值（通常为 `2×log2(n)`）时切换，避免快速排序在最坏情况下（如已排序数组）退化为 O (n²) 复杂度。
+- **插入排序（Insertion sort）**：当子数组长度小于阈值（通常为 16~20）时使用，因为插入排序在小规模数据上效率更高（减少递归开销）。
+
+**功能**：对范围 [first, last) 进行**不稳定排序**（默认升序，可自定义比较规则）。
+
+- 不稳定：相等元素的相对顺序可能改变；
+
+- 效率高：平均时间复杂度 O (n log n)。
+
+**示例**：默认升序 + 自定义降序 + 自定义结构体排序
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+#include <string>
+
+// 自定义结构体：学生（姓名+分数）
+struct Student {
+    std::string name;
+    int score;
+};
+
+int main() {
+    // 示例1：默认升序排序（int类型）
+    std::vector<int> nums1 = {3, 1, 4, 1, 5};
+    std::sort(nums1.begin(), nums1.end());
+    std::cout << "默认升序：";
+    for (int x : nums1) std::cout << x << " ";  // 1 1 3 4 5
+
+    // 示例2：自定义降序排序（用lambda）
+    std::vector<int> nums2 = {3, 1, 4, 1, 5};
+    std::sort(nums2.begin(), nums2.end(),
+        [](int a, int b) { return a > b; });  // 降序规则：a>b时a在前
+    std::cout << "\n自定义降序：";
+    for (int x : nums2) std::cout << x << " ";  // 5 4 3 1 1
+
+    // 示例3：自定义结构体排序（按分数升序，分数相同按姓名升序）
+    std::vector<Student> students = {
+        {"Bob", 85}, {"Alice", 90}, {"Bob", 80}
+    };
+    std::sort(students.begin(), students.end(),
+        [](const Student& a, const Student& b) {
+            if (a.score != b.score) {
+                return a.score < b.score;  // 分数升序
+            } else {
+                return a.name < b.name;    // 分数相同，姓名升序
+            }
+        });
+    std::cout << "\n结构体排序：\n";
+    for (const auto& s : students) {
+        std::cout << s.name << " " << s.score << "\n";  // Bob80 → Alice90 → Bob85（分数升序）
+    }
+
+    return 0;
+}
+```
+
+##### b. stable_sort
+
+`std::stable_sort` 的核心目标是**稳定排序**（相等元素的相对顺序不变），同时保证 O (n log n) 的时间复杂度。主流实现采用 **归并排序（Mergesort）**，或其变种（如原地归并排序优化）。
+
+归并排序的稳定性来源于其 “合并” 步骤：当两个子数组中出现相等元素时，优先选取前一个子数组的元素，从而保留原始顺序。
+
+**功能**：对范围进行**稳定排序**（相等元素的相对顺序保持不变），适合需要保留原始顺序的场景（如先按班级排序，再按分数排序，相同分数的学生仍保持原班级顺序）。
+
+**示例**：稳定排序 vs 不稳定排序（对比相等元素顺序）
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+// 自定义结构体：值+原始索引（用于观察顺序）
+struct Pair {
+    int val;
+    int index;  // 原始索引，标记插入顺序
+};
+
+int main() {
+    std::vector<Pair> vec = {{2, 0}, {1, 1}, {2, 2}, {1, 3}};
+
+    // 示例1：sort（不稳定排序，相等val的元素顺序可能变）
+    auto vec_sort = vec;
+    std::sort(vec_sort.begin(), vec_sort.end(),
+        [](const Pair& a, const Pair& b) { return a.val < b.val; });
+    std::cout << "sort（不稳定）：\nval 索引\n";
+    for (const auto& p : vec_sort) {
+        std::cout << p.val << "   " << p.index << "\n";  // 可能输出：1(1)、1(3)、2(2)、2(0)（2的索引顺序变了）
+    }
+
+    // 示例2：stable_sort（稳定排序，相等val的元素保持原索引顺序）
+    auto vec_stable = vec;
+    std::stable_sort(vec_stable.begin(), vec_stable.end(),
+        [](const Pair& a, const Pair& b) { return a.val < b.val; });
+    std::cout << "\nstable_sort（稳定）：\nval 索引\n";
+    for (const auto& p : vec_stable) {
+        std::cout << p.val << "   " << p.index << "\n";  // 固定输出：1(1)、1(3)、2(0)、2(2)（2的索引顺序不变）
+    }
+
+    return 0;
+}
+```
+
+#### ②部分排序函数（无需全量排序）
+
+##### a. partial_sort
+
+**功能**：对范围进行**部分排序**—— 使前 n 个元素成为范围中 “最小的 n 个元素” 且已升序排列，其余元素无序（比全量排序更高效，适合只需前 n 个有序元素的场景）。
+
+**示例**：取前 3 个最小元素并排序
+
+```
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {5, 3, 1, 4, 2, 6};
+    int n = 3;  // 要排序的前3个元素（最小的3个）
+
+    // 语法：partial_sort(范围开始, 前n个元素的结束位置, 范围结束)
+    std::partial_sort(nums.begin(), nums.begin() + n, nums.end());
+
+    std::cout << "部分排序后（前3个最小且有序）：";
+    for (int x : nums) std::cout << x << " ";  // 1 2 3 5 4 6（前3个是最小的1、2、3，后3个无序）
+
+    return 0;
+}
+```
+
+##### b. nth_element
+
+**功能**：使范围中 “第 n 个元素”（索引从 0 开始）处于 “正确的排序位置”—— 所有小于它的元素在左边，大于它的元素在右边（左右元素无需有序），适合快速找 “第 k 小 / 大元素” 或中位数。
+
+**示例**：找第 2 个（索引 2）元素，使其左边≤它、右边≥它
+
+```c++
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {5, 3, 1, 4, 2, 6};
+    int n = 2;  // 目标元素的索引（找第3小元素，因为索引从0开始）
+
+    // 语法：nth_element(范围开始, 目标元素位置, 范围结束)
+    std::nth_element(nums.begin(), nums.begin() + n, nums.end());
+
+    std::cout << "nth_element后（索引2元素在正确位置）：";
+    for (int x : nums) std::cout << x << " ";  // 如：1 2 3 5 4 6（索引2是3，左边1、2≤3，右边5、4、6≥3）
+    std::cout << "\n第" << n+1 << "小元素：" << nums[n];  // 第3小元素是3
+
+    return 0;
+}
+```
+
+#### ③二分查找函数（需基于已排序范围）
+
+**核心前提**：输入范围必须是**已排序**的（升序，自定义比较需对应），否则结果未定义。
+
+##### a. lower_bound
+
+**功能**：查找范围中 “第一个 ≥ value” 的元素，返回其迭代器（未找到返回 last）。
+
+##### b. upper_bound
+
+**功能**：查找范围中 “第一个> value” 的元素，返回其迭代器（未找到返回 last）。
+
+##### c. binary_search
+
+**功能**：检查范围中是否存在 value，返回 bool（本质是基于 lower_bound 实现，效率 O (log n)）。
+
+**示例**：三者对比使用（在升序 vector 中找 3）
+
+```c++
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> nums = {1, 2, 3, 3, 4, 5};  // 已升序排序
+    int target = 3;
+
+    // 1. lower_bound：第一个≥3的元素（索引2）
+    auto it_lower = std::lower_bound(nums.begin(), nums.end(), target);
+    if (it_lower != nums.end()) {
+        std::cout << "lower_bound：值=" << *it_lower << "，索引=" << std::distance(nums.begin(), it_lower) << "\n";  // 值=3，索引=2
+    }
+
+    // 2. upper_bound：第一个>3的元素（索引4）
+    auto it_upper = std::upper_bound(nums.begin(), nums.end(), target);
+    if (it_upper != nums.end()) {
+        std::cout << "upper_bound：值=" << *it_upper << "，索引=" << std::distance(nums.begin(), it_upper) << "\n";  // 值=4，索引=4
+    }
+
+    // 3. binary_search：是否存在3
+    bool exists = std::binary_search(nums.begin(), nums.end(), target);
+    std::cout << "binary_search：" << (exists ? "存在" : "不存在") << target;  // 存在3
+
+    // 扩展：统计target出现的次数（upper_bound - lower_bound）
+    int count = it_upper - it_lower;
+    std::cout << "\n" << target << "出现的次数：" << count;  // 3出现2次
+
+    return 0;
+}
+```
+
+#### ④合并函数（需基于已排序范围）
+
+##### a. merge
+
+**功能**：合并两个**已排序范围**为一个新的有序范围（默认升序，保持稳定性），适合将两个有序数组 /vector 合并为一个有序容器。
+
+**示例**：合并两个升序 vector
+
+```c++
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    // 两个已升序排序的范围
+    std::vector<int> a = {1, 3, 5};
+    std::vector<int> b = {2, 4, 6};
+    std::vector<int> merged;  // 目标容器（存储合并结果）
+
+    // 提前分配空间（可选，提升效率，避免频繁扩容）
+    merged.reserve(a.size() + b.size());
+
+    // 语法：merge(范围1开始, 范围1结束, 范围2开始, 范围2结束, 目标容器迭代器)
+    std::merge(a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(merged));
+
+    std::cout << "合并后的有序范围：";
+    for (int x : merged) std::cout << x << " ";  // 1 2 3 4 5 6
+
+    return 0;
+}
+```
+
+### 总结
+
+排序及相关操作的关键注意事项：
+
+1. **迭代器要求**：sort、stable_sort、partial_sort、nth_element 需**随机访问迭代器**，仅支持 vector、array、deque，不支持 list（list 用 list::sort()）。
+
+1. **排序前提**：lower_bound、upper_bound、binary_search、merge 必须基于**已排序范围**（默认升序，自定义比较需统一规则）。
+
+1. **稳定性选择**：需保留相等元素相对顺序用 stable_sort，否则用 sort（效率更高）。
+
+1. **效率差异**：全量排序用 sort，只需前 n 个有序用 partial_sort，只需第 k 个元素位置用 nth_element（效率最高，O (n)）。
+
+### （4）集合操作（针对有序范围）
+
+这类算法用于处理两个**已排序范围**，模拟数学中的集合运算（需确保输入范围已排序）。
+
+| 函数                     | 功能描述                                                     |
+| ------------------------ | ------------------------------------------------------------ |
+| set_union                | 求两个范围的并集（元素存在于任一范围，去重，结果有序）。     |
+| set_intersection         | 求两个范围的交集（元素同时存在于两个范围，结果有序）。       |
+| set_difference           | 求两个范围的差集（元素存在于第一个范围但不在第二个，结果有序）。 |
+| set_symmetric_difference | 求两个范围的对称差集（元素存在于其中一个但不同时存在于两个，结果有序）。 |
+
+**示例**：求两个有序数组的交集：
+
+```c++
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> a = {1, 2, 3, 4}, b = {3, 4, 5, 6}, res;
+    // 求交集（需 a 和 b 已排序）
+    std::set_intersection(a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(res));
+    // res 为 {3,4}
+    return 0;
+}
+```
+
+### （5）排列算法（生成序列的排列）
+
+用于生成序列的字典序排列（需序列已排序，否则从当前状态开始生成）。
+
+| 函数             | 功能描述                                                     |
+| ---------------- | ------------------------------------------------------------ |
+| next_permutation | 将序列转换为**下一个字典序更大**的排列（成功返回 true，否则返回 false，表示已为最大排列）。 |
+| prev_permutation | 将序列转换为**上一个字典序更小**的排列（类似 next_permutation）。 |
+
+**示例**：生成所有排列：
+
+```c++
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+int main() {
+    std::vector<int> v = {1, 2, 3};
+    std::sort(v.begin(), v.end()); // 先排序，确保从最小排列开始
+    do {
+        for (int x : v) std::cout << x << " ";
+        std::cout << "\n";
+    } while (std::next_permutation(v.begin(), v.end()));
+    // 输出所有 6 种排列
+    return 0;
+}
+```
+
+### （6）注意事项
+
+1. **迭代器类型要求**：不同算法对迭代器类型有要求（如 sort 需要随机访问迭代器，find 仅需输入迭代器），使用时需确保容器迭代器满足要求（如 list 的迭代器是双向的，不能用 sort）。
+
+1. **目标范围大小**：copy、transform 等算法不会自动扩容目标容器，需提前预留空间（或用 back_inserter 等插入迭代器自动插入）。
+
+1. **自定义谓词**：谓词需满足 “纯函数” 特性（相同输入返回相同结果，无副作用），否则可能导致未定义行为。
+
+1. **C++ 标准扩展**：C++11 及以上新增了大量算法（如 all_of、copy_if），C++20 引入了 ranges 版本的算法（更简洁，支持管道语法），可根据编译器版本选择使用。
+
+## 3、Iterator
+
+在 C++ 中，**迭代器（Iterator）** 是连接容器（Container）与算法（Algorithm）的核心桥梁，它提供了一种统一的方式来访问容器中的元素，而无需暴露容器的内部实现细节。迭代器的设计思想类似于指针，但比指针更通用 —— 它可以适配各种不同存储结构的容器（如数组、链表、树等）。
+
+### （1）迭代器的核心作用
+
+迭代器的本质是 **“元素访问工具”**，主要解决两个问题：
+
+1. **统一接口**：无论容器内部是连续存储（如vector）还是非连续存储（如list），迭代器都提供一致的操作方式（如++移动到下一个元素，*获取元素值）。
+
+1. **解耦容器与算法**：STL 中的算法（如sort、find）通过迭代器操作元素，无需关心具体是哪种容器，极大提升了代码复用性。
+
+### （2）迭代器的分类与特性
+
+C++ 标准根据迭代器支持的操作能力，将其分为**5 类**，每类迭代器支持的操作不同，且存在 “继承” 关系（如随机访问迭代器同时也是双向迭代器）。
+
+| 迭代器类型                               | 核心能力（支持的操作）                                       | 典型对应容器 / 场景                     |
+| ---------------------------------------- | ------------------------------------------------------------ | --------------------------------------- |
+| 输入迭代器（Input Iterator）             | 只读访问，支持++（单向移动）、*（读值）、==/!=（比较），不可重复读取同一元素 | istream_iterator（从输入流读数据）      |
+| 输出迭代器（Output Iterator）            | 只写访问，支持++（单向移动）、*（写值），不可重复写入同一元素 | ostream_iterator（向输出流写数据）      |
+| 前向迭代器（Forward Iterator）           | 可读可写，支持输入 / 输出迭代器的所有操作，且可重复访问元素（可多次++遍历） | forward_list（单向链表）、unordered_set |
+| 双向迭代器（Bidirectional Iterator）     | 支持前向迭代器的所有操作，额外支持--（反向移动）             | list（双向链表）、set、map              |
+| 随机访问迭代器（Random Access Iterator） | 支持双向迭代器的所有操作，额外支持随机访问：+=n/-=n（移动 n 步）、[]（访问第 n 个元素）、</>（距离比较） | vector、array、deque、原生指针          |
+
+### （3）迭代器的基本操作
+
+不同类型的迭代器支持的操作不同，以下是通用基础操作（具体支持取决于类型）：
+
+| 操作      | 含义                                                     | 支持的迭代器类型                        |
+| --------- | -------------------------------------------------------- | --------------------------------------- |
+| *it       | 获取迭代器指向的元素（读 / 写，取决于迭代器是否为const） | 除输出迭代器外（输出迭代器*it仅用于写） |
+| it->mem   | 等价于(*it).mem（访问元素的成员）                        | 输入、前向、双向、随机访问迭代器        |
+| ++it      | 移动到下一个元素（前置递增）                             | 所有迭代器                              |
+| it++      | 移动到下一个元素（后置递增，返回旧值）                   | 所有迭代器                              |
+| --it      | 移动到上一个元素（前置递减）                             | 双向、随机访问迭代器                    |
+| it--      | 移动到上一个元素（后置递减，返回旧值）                   | 双向、随机访问迭代器                    |
+| it + n    | 移动 n 个元素（返回新迭代器）                            | 随机访问迭代器                          |
+| it - n    | 反向移动 n 个元素（返回新迭代器）                        | 随机访问迭代器                          |
+| it1 - it2 | 计算两个迭代器之间的距离（元素个数）                     | 随机访问迭代器                          |
+| it[n]     | 等价于*(it + n)（访问第 n 个元素）                       | 随机访问迭代器                          |
+| it1 < it2 | 比较迭代器位置（是否 it1 在 it2 前）                     | 随机访问迭代器                          |
+
+### （4）迭代器的获取与使用
+
+容器通过成员函数提供迭代器，最常用的是：
+
+- begin()：返回指向容器**第一个元素**的迭代器；
+
+- end()：返回指向容器**最后一个元素的下一个位置**的迭代器（“尾后迭代器”，作为遍历结束标志）；
+
+- cbegin()/cend()：返回const迭代器（只能读元素，不能修改）；
+
+- rbegin()/rend()：返回反向迭代器（++实际是向前移动，用于逆序遍历）。
+
+#### 示例：用迭代器遍历容器
+
+```
+#include <vector>
+#include <list>
+#include <iostream>
+using namespace std;
+
+int main() {
+    vector<int> vec = {1, 2, 3, 4};
+    list<int> lst = {5, 6, 7, 8};
+
+    // 遍历vector（随机访问迭代器）
+    for (auto it = vec.begin(); it != vec.end(); ++it) {
+        cout << *it << " "; // 输出：1 2 3 4
+    }
+
+    // 逆序遍历list（双向迭代器 + 反向迭代器）
+    for (auto it = lst.rbegin(); it != lst.rend(); ++it) {
+        cout << *it << " "; // 输出：8 7 6 5
+    }
+
+    return 0;
+}
+```
+
+### （5）特殊迭代器
+
+除了容器自带的迭代器，C++ 还提供了一些 “辅助迭代器” 用于特定场景：
+
+1. **反向迭代器（reverse_iterator）**：
+
+对正向迭代器的封装，++操作实际是正向迭代器的--，用于逆序遍历。例如rbegin()返回的就是反向迭代器，等价于reverse_iterator(end())。
+
+1. **插入迭代器（Insert Iterator）**：
+
+用于在容器中插入元素（而非覆盖），常见的有：
+
+示例：用back_inserter向 vector 插入元素
+
+```
+#include <algorithm> // for copy
+#include <vector>
+using namespace std;
+
+int main() {
+    vector<int> src = {1, 2, 3};
+    vector<int> dest;
+
+    // 用back_inserter自动扩容dest并插入元素
+    copy(src.begin(), src.end(), back_inserter(dest)); 
+    // dest现在为{1,2,3}
+    return 0;
+}
+```
+
+- - back_inserter(c)：在容器c的末尾插入（需容器支持push_back，如vector、list）；
+
+- - front_inserter(c)：在容器c的头部插入（需容器支持push_front，如list、deque）；
+
+- - inserter(c, it)：在迭代器it指向的位置前插入（需容器支持insert）。
+
+1. **流迭代器（Stream Iterator）**：
+
+关联输入 / 输出流与迭代器，方便从流中读写数据。例如：
+
+- - istream_iterator<T>(cin)：从标准输入流读T类型数据；
+
+- - ostream_iterator<T>(cout, " ")：向标准输出流写T类型数据，间隔为空格。
+
+### （6）迭代器失效问题
+
+当容器进行**插入**或**删除**操作时，迭代器可能会 “失效”（即指向错误的位置或已释放的内存），使用失效的迭代器会导致未定义行为（如崩溃）。不同容器的迭代器失效规则不同：
+
+| 容器类型          | 插入操作后迭代器失效规则                                     | 删除操作后迭代器失效规则                                     |
+| ----------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| vector            | 若插入后重新分配内存（容量不足），**所有迭代器失效**；否则仅插入位置后的迭代器失效。 | 仅删除位置后的迭代器失效。                                   |
+| list/forward_list | 所有迭代器均不失效（节点独立存储，插入不影响其他节点）。     | 仅被删除节点的迭代器失效，其他迭代器不受影响。               |
+| deque             | 头部 / 尾部插入：若未重新分配内存，仅可能失效首尾迭代器；中间插入则**所有迭代器失效**。 | 头部 / 尾部删除：可能失效首尾迭代器；中间删除则**所有迭代器失效**。 |
+| set/map           | 所有迭代器均不失效（树结构，插入不影响其他节点）。           | 仅被删除元素的迭代器失效，其他迭代器不受影响。               |
+
+### （7）迭代器与指针的关系
+
+- 迭代器可以看作 “广义指针”：对于连续存储的容器（如vector），其迭代器通常直接封装原生指针（T*），因此性能与指针一致；
+
+- 对于非连续存储的容器（如list），迭代器需要通过自定义++/--操作实现节点跳转（本质是对节点指针的封装）。
+
+## 4、Functional
+
+
 
