@@ -1575,7 +1575,34 @@ LANG=zh_CN.UTF-8 vimtutor
 | ------ | --------------------------------------------------------- |
 | Ctrl+d | 可以在你输入命令时，显示可能的输入可以使用<Tab>键补全命令 |
 
-## 2、
+## 2、vim缩进设置
+
+用 Vim 打开文件（例如 `vim ~/.vimrc`），添加以下内容（以 4 空格为例，根据需求修改数字）：
+
+```vim
+" 缩进宽度为 4 空格
+set shiftwidth=4
+set tabstop=4
+set softtabstop=4
+" 用空格代替制表符
+set expandtab
+" 自动缩进（新行与上一行缩进一致）
+set autoindent
+" 智能缩进（针对代码，如 if/for 块自动增加缩进）
+set smartindent
+```
+
+**针对不同文件类型设置不同缩进**
+
+```vim
+" 对 Python,c,cpp 文件设置 4 空格缩进
+autocmd FileType python setlocal shiftwidth=4 tabstop=4 softtabstop=4 expandtab
+
+" 对 HTML/JS/CSS 文件设置 2 空格缩进
+autocmd FileType html,js,css setlocal shiftwidth=2 tabstop=2 softtabstop=2 expandtab
+```
+
+
 
 # 四、shell脚本
 
@@ -1585,11 +1612,2216 @@ LANG=zh_CN.UTF-8 vimtutor
 
 ## 1、GCC
 
+### （1）C++文件的编译过程
+
+通常分为**4 个核心阶段**：**预处理→编译→汇编→链接**
+
+#### ①预处理（生成 `.i` 文件）
+
+处理宏定义（`#define`）、头文件包含（`#include`）等，生成预处理后的代码
+
+```powershell
+# 处理 main.cpp，生成 main.i
+g++ -E main.cpp -o main.i
+
+# 处理 func.cpp，生成 func.i
+g++ -E func.cpp -o func.i
+```
+
+#### ②编译阶段（生成 `.s` 汇编文件）
+
+将预处理后的代码转换为汇编语言
+
+```powershell
+# 从 main.i 生成 main.s（汇编代码）
+g++ -S main.i -o main.s
+
+# 从 func.i 生成 func.s
+g++ -S func.i -o func.s
+```
+
+#### ③汇编阶段（生成 `.o` 目标文件）
+
+将汇编代码转换为机器码（二进制目标文件）
+
+```powershell
+# 从 main.s 生成 main.o（目标文件）
+g++ -c main.s -o main.o
+
+# 从 func.s 生成 func.o
+g++ -c func.s -o func.o
+```
+
+#### ④链接阶段（生成可执行文件）
+
+将多个目标文件 / 库文件合并为可执行程序或库
+
+```powershell
+# 链接 main.o 和 func.o，生成可执行文件 main
+g++ main.o func.o -o main
+```
+
+### （2）常用的核心选项
+
+#### ①警告与错误控制
+
+警告选项能帮助发现代码潜在问题，建议开发时开启：
+
+- `-Wall`：显示 “几乎所有” 有用的警告（如未使用的变量、类型不匹配等）。
+- `-Wextra`：显示比 `-Wall` 更多的警告（如无意义的比较、冗余的括号等）。
+- `-Werror`：将所有警告视为错误（强制修正警告，避免隐患）。
+- `-pedantic`：检查代码是否严格符合 C++ 标准（禁用编译器扩展语法）。
+
+```shell
+# 开启所有警告，并将警告视为错误
+g++ main.cpp -o myprogram -Wall -Wextra -Werror
+```
+
+#### ②优化选项
+
+通过优化选项提升程序运行效率或减小体积（默认无优化 `-O0`）：
+
+- `-O0`：无优化（默认，编译速度快，适合调试）。
+- `-O1`：基础优化（平衡编译速度和程序性能）。
+- `-O2`：进一步优化（启用更多优化策略，如循环展开、常量传播等，推荐生产环境）。
+- `-O3`：最高级优化（在 `-O2` 基础上增加更激进的优化，可能增加编译时间和二进制体积）。
+- `-Os`：优化程序体积（优先减小二进制文件大小，适合嵌入式场景）。
+
+```shell
+# 以 O2 级别优化编译
+g++ main.cpp -o myprogram -O2
+```
+
+#### ③调试信息
+
+生成调试信息，配合 `gdb` 调试工具使用：
+
+- `-g`：生成基本调试信息（支持 `gdb` 断点、变量查看等）。
+- `-ggdb`：生成更适合 `gdb` 的调试信息（包含更多细节）。
+
+```shell
+# 生成调试信息，用于 gdb 调试
+g++ main.cpp -o myprogram -g
+```
+
+#### ④头文件与库文件搜索
+
+`-I`<目录>：指定头文件搜索路径（优先于系统默认路径）。
+
+```shell
+g++ -c main.cpp -Iinclude -o main.o
+```
+
+`-L`<目录>：指定库文件搜索路径（优先于系统默认路径）。
+
+```
+g++ main.cpp -L./lib -o main.o
+```
+
+`-l`<库名>：链接指定的库（省略前缀 lib 和后缀 .a/.so）。
+
+```
+g++ main.cpp -o main.o -lpthread
+```
+
+#### ⑤C++ 标准指定
+
+通过 `-std` 选项指定编译时遵循的 C++ 标准（默认可能因编译器版本不同）：
+
+- `-std=c++98`：C++98 标准（最早的 C++ 标准）。
+- `-std=c++11`：C++11 标准（引入 lambda、智能指针等重要特性）。
+- `-std=c++17`：C++17 标准（引入 `std::optional`、结构化绑定等）。
+- `-std=c++20`：C++20 标准（引入概念 `concept`、模块 `module` 等）。
+
+```bash
+# 使用 C++17 标准编译
+g++ main.cpp -o myprogram -std=c++17
+```
+
+#### ⑥宏定义
+
+通过 -D 选项在编译时定义宏（等效于代码中的 #define 宏名）：
+-D<宏名>：定义宏（无值）。
+
+```shell
+g++ main.cpp -DDEBUG #（定义 DEBUG 宏，代码中可通过 #ifdef DEBUG 条件编译）。
+```
+
+-D<宏名>=<值>：定义带值的宏。
+
+```shell
+g++ main.cpp -DMAX_SIZE=100 #（定义 MAX_SIZE=100）。
+```
+
+### （3）实际开发g++的使用
+
+#### ①简化编译（一步到位）
+
+实际开发中，无需手动分阶段，`g++` 可直接从源文件生成可执行文件（自动完成预处理→编译→汇编→链接）。
+
+```shell
+g++ main.cpp threadpool.cpp -Iinclude -Llib -o main -Wall -std=c++11 -lpthread
+```
+
+#### ②多文件编译(分阶段编译提高效率)
+
+```shell
+# 分别编译为目标文件
+g++ -c file1.cpp -Iinclude -Llib -o  file1.o -Wall -std=c++11
+g++ -c file2.cpp -Iinclude -Llib -o  file2.o -Wall -std=c++11
+# 链接目标文件生成可执行程序
+g++ file1.o file2.o -o myprogram -lpthread
+```
+
 ## 2、Cmake与Makefile
+
+### （1）Makefile
+
+#### ①Makefile 基本结构
+
+```makefile
+目标（target）: 依赖（prerequisites）
+	命令（commands）
+```
+
+- **目标（target）**：要生成的文件（如 `.o` 目标文件、可执行文件），或一个 “动作”（如 `clean`，称为 “伪目标”）。
+- **依赖（prerequisites）**：生成目标所需要的文件或其他目标（若依赖不存在或比目标更新，会触发命令执行）。
+- **命令（commands）**：生成目标的具体操作（如编译命令 `gcc`），**必须以 Tab 键开头**（不能用空格，这是语法强制要求）。
+
+#### ②简单实现Makefile
+
+假如项目的结构是这样
+
+```plaintext
+Threadpool/
+├──build/
+├──output/
+├──lib/
+├── include/
+│   └── threadpool.h
+└── src/
+    ├── main.cpp
+    └── threadpool.cpp
+```
+
+- bulid存储目标文件
+
+- output存储可执行文件
+
+- include存储头文件
+
+- lib存储库文件
+
+- src存储cpp文件
+
+由Makdefile的基本结构我们可以实现简单的Makeflie
+
+```makefile
+#生成执行文件main，依赖为main.o threadpool.o
+output/main: build/main.o build/threadpool.o
+	g++ build/main.o build/threadpool.o -o output/main.exe
+build/main.o:
+	g++ -c src/main.cpp -Iinclude -Llib -o build/main.o
+bulid/threadpool.o:
+	g++ -c src/threadpool.cpp -Iinclude -Llib -o build/threadpool.o
+```
+
+#### ③Makefile语法
+
+##### a.变量
+
+`make` 内置了部分变量，可直接使用（也可重定义）：
+
+- `CC`：默认编译器（如 `cc`，通常重定义为 `gcc`）。
+- `CFLAGS`：编译选项（如 `-Wall` 开启警告，`-I` 指定头文件路径）。
+- `LDFLAGS`：链接选项（如 `-L` 指定库路径）。
+- `LDLIBS`：链接的库（如 `-lm` 链接数学库）。
+
+```makefile
+# 定义变量
+CC := gcc          # 编译器
+CFLAGS := -Wall -Iinclude -std=c++11 # 编译选项（警告+头文件目录）
+LDFLAGS := -Llib   # 库路径
+LDLIBS := -lm      # 链接数学库
+
+# 生成 app，依赖 main.o 和 func.o
+app: main.o func.o
+	$(CC) $(LDFLAGS) main.o func.o -o app $(LDLIBS)  # 引用变量
+
+# 生成 .o 文件（依赖 .c 文件）
+main.o: main.c
+	$(CC) $(CFLAGS) -c main.c -o main.o
+
+func.o: func.c
+	$(CC) $(CFLAGS) -c func.c -o func.o
+```
+
+**俩种变量定义方式**
+递归展开（=）：调用时才获取值，在前面的变量可以获取后定义的值。
+例：A = $(B)，B = hello，则 $(A) 最终为 hello。
+简单展开（:=）：定义时值就固定，讲究先后顺序。
+例：A := $(B)，B = hello，则 $(A) 初始为空白（因定义 A 时 B 未赋值）。
+
+##### b.伪目标（Phony Target）
+
+伪目标不是实际文件，而是一个 “动作”（如 `clean` 清理生成文件）。若目录中存在与伪目标同名的文件，`make` 会误认为目标已存在而不执行命令，因此需用 `.PHONY` 声明伪目标。
+
+```makefile
+# 声明 clean 为伪目标
+.PHONY: clean
+
+# 清理生成的 .o 文件和可执行文件
+clean:
+	rm -f *.o app  # 删除命令（Tab 开头）
+```
+
+##### c.模式规则（Pattern Rules）
+
+模式规则用于批量处理同类文件（如所有 `.c` 生成 `.o`），通过通配符 `%` 匹配文件名（`%` 代表任意字符串）。
+
+`%` 在目标和依赖中代表相同的字符串（如 `%.o: %.c` 表示 “所有 `.o` 文件依赖同名 `.c` 文件”）
+
+```makefile
+CC := gcc
+CFLAGS := -Wall
+
+# 模式规则：所有 .o 依赖同名 .c，自动编译
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@  # $< 和 $@ 是自动变量（见下文）
+
+# 生成 app，依赖所有 .o 文件
+app: main.o func.o
+	$(CC) $^ -o $@  # $^ 是自动变量
+```
+
+##### d.自动变量（Automatic Variables）
+
+自动变量在规则的命令中使用，代表目标、依赖等，简化命令编写。常用自动变量：
+
+| 变量 | 含义                                                         |
+| ---- | ------------------------------------------------------------ |
+| `$@` | 目标文件名（如规则 `app: main.o` 中，`$@` 代表 `app`）       |
+| `$<` | 第一个依赖文件名（如规则 `app: main.o func.o` 中，`$<` 代表 `main.o`） |
+| `$^` | 所有依赖文件名（去重，如 `main.o func.o`）                   |
+| `$+` | 所有依赖文件名（包含重复，较少用）                           |
+| `$?` | 所有比目标新的依赖文件名                                     |
+
+```makefile
+app: main.o func.o
+	$(CC) $^ -o $@  # 等价于 gcc main.o func.o -o app
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@  # 等价于 gcc ... -c 源文件 -o 目标文件
+```
+
+##### e.条件判断（Conditionals）
+
+条件判断用于根据变量值执行不同规则，语法类似脚本语言，常用关键字：`ifeq`、`ifneq`、`ifdef`、`ifndef`、`else`、`endif`。
+
+```makefile
+CC := gcc
+
+# 若编译器是 gcc，添加 -std=c99 选项
+ifeq ($(CC), gcc)
+CFLAGS := -Wall -std=c99
+else
+CFLAGS := -Wall  # 其他编译器不添加 c99 选项
+endif
+
+app: main.c
+	$(CC) $(CFLAGS) main.c -o app
+```
+
+##### f.函数（Functions）
+
+Makefile 提供内置函数，用于处理字符串、文件列表等，格式为 `$(函数名 参数)`。
+
+**常用函数**：
+
+1. **`wildcard`**：获取匹配模式的文件列表（类似 shell 通配符）。
+
+   例：`src := $(wildcard *.c)` 👉 `src` 为当前目录所有 `.c` 文件（如 `main.c func.c`）。
+
+2. **`patsubst`**：模式替换（将字符串按规则替换）。
+
+   格式：`$(patsubst 原模式, 目标模式, 字符串)`
+
+   例：`obj := $(patsubst %.c, %.o, $(src))` 👉 将 `src` 中 `.c` 替换为 `.o`（如 `main.o func.o`）。
+
+3. **`foreach`**：循环处理列表。
+
+   格式：`$(foreach 变量, 列表, 操作)`
+
+   例：`files := a b c`，`$(foreach f, $(files), $(f).txt)` 👉 结果为 `a.txt b.txt c.txt`。
+
+4. **`shell`**：执行 shell 命令并返回结果。
+
+   例：`date := $(shell date)` 👉 `date` 为当前系统时间。
+
+##### g.默认目标
+
+`make` 工具默认执行 Makefile 中**第一个目标**（若执行 `make` 时不指定目标）。通常将 `all` 作为第一个目标，依赖最终生成的可执行文件，确保默认构建完整项目。
+
+```makefile
+# 第一个目标，默认执行
+all: app
+
+app: main.o func.o
+	$(CC) $^ -o $@
+
+# 其他规则...
+```
+
+##### h.搜索路径（VPATH 和 vpath）
+
+当源文件不在当前目录时，可通过 VPATH 或 vpath 指定搜索路径。
+
+**`VPATH` 变量**：通用路径搜索（不区分文件类型）
+
+```makefile
+VPATH := src:include:bulid  # 多个目录用冒号（:）分隔（Windows 下也可用分号 ;）
+```
+
+当依赖不在当前目录时就会自动按顺序搜索src，include，bulid，而不用写src/main.cpp,include/main.h之类的长路径
+
+**`vpath` 关键字**：按文件类型搜索（更灵活）
+
+```makefile
+# 为 .cpp 文件指定搜索目录：src/
+vpath %.cpp src
+# 为 .h 文件指定搜索目录：include/
+vpath %.h include
+```
+
+#### ④实现复杂的Makefile文件
+
+了解并学习Makefile的语法之后就可以尝试更复杂的Makefile，使其更加通用。假设项目路径还是如此
+
+```tex
+Threadpool/
+├──build/
+├──output/
+├──lib/
+├── include/
+│   └── threadpool.h
+└── src/
+    ├── main.cpp
+    └── threadpool.cpp
+```
+
+##### a.编译器和选项
+
+- `CC`：默认编译器（如 `cc`，通常重定义为 `gcc`）。
+- `CFLAGS`：编译选项（如 `-Wall` 开启警告，`-I` 指定头文件路径）。
+- `LDFLAGS`：链接选项（如 `-L` 指定库路径）。
+- `LDLIBS`：链接的库（如 `-lm` 链接数学库）。
+
+```Makefile
+#设置编译器c用gcc，cpp用g++
+CC:=g++
+#-Wall开启警告 -I指定头文件路径 -O优化 -std=c++11指定c++标准版本
+CFLAGS:=-Wall -Iinclude -o2 -std=c++11
+#链接选项（如 `-L` 指定库路径）
+LDFLAGS:= -Llib
+#链接线程库
+LDLIBS:= -lpthread
+```
+
+##### b.路径与生成文件名称
+
+```makefile
+#源文件文件夹
+SRC_DIR := src
+#可执行文件路径
+OUTPUT_DIR:= output
+#目标文件路径
+BUILD_DIR:= bulid
+#生成的可执行文件名称
+EXE_NAME:= main.exe
+#源文件名称
+SRC := $(wildcard $(SRC_DIR)*.cpp)
+#目标文件名称,.o文件不一定存在，所以用递归展开
+OBJ := $(patsubst %.cpp, %.o, $(SRC)) #OBJ := $(SRC:.cpp=.o)
+```
+
+##### c.实现链接与编译命令
+
+这里用到自动变量
+
+| 变量 | 含义                                                         |
+| ---- | ------------------------------------------------------------ |
+| `$@` | 目标文件名（如规则 `app: main.o` 中，`$@` 代表 `app`）       |
+| `$<` | 第一个依赖文件名（如规则 `app: main.o func.o` 中，`$<` 代表 `main.o`） |
+| `$^` | 所有依赖文件名（去重，如 `main.o func.o`）                   |
+| `$+` | 所有依赖文件名（包含重复，较少用）                           |
+| `$?` | 所有比目标新的依赖文件名                                     |
+
+```makefile
+#指定默认目标
+all: $(EXE_NAME)
+#链接生成可执行文件 依赖.o文件,目标文件夹，执行文件文件夹
+$(EXE_NAME): $(OBJ) $(BUILD_DIR) $(OUTPUT_DIR)
+	$(CC) $(OBJ) -o $@ $(LDFLAGS) $(LDLIBS)
+	echo 编译完成
+#编译生成目标文件 依赖.cpp文件
+$(BUILD_DIR)/%.o:$(SRC_DIR)/%.cpp
+	$(CC) -c $< -o $@ $(CFLAGS)
+
+$(BUILD_DIR):
+	if not exist "$@" $(MKDIR) "$@"
+$(OUTPUT_DIR):
+	if not exist "$@" $(MKDIR) "$@"
+```
+
+d.实现clean、伪目标与执行
+
+实现window与linux系统的兼容
+
+```makefile
+ifeq ($(OS), Windows_NT) # Windows 系统
+clean:
+	if exist $(BUILD_DIR)\*.o del /f /q $(BUILD_DIR)\*.o
+	if exist $(OUTPUT_DIR)\$(EXE_NAME) del /f /q $(OUTPUT_DIR)\$(EXE_NAME)
+else # Linux/macOS 或其他类 Unix 系统
+clean:	
+	if exist $(BUILD_DIR)/*.o rm -f $(BUILD_DIR)/*.o
+	if exist $(OUTPUT_DIR)/$(EXE_NAME) rm -f $(OUTPUT_DIR)/$(EXE_NAME)
+endif
+run: all
+	./$(OUTPUT_DIR)/$(EXE_NAME)
+```
+
+e.完整代码
+
+```makefile
+# 为 .cpp 文件指定搜索目录：src/
+vpath %.cpp src
+# 为 .h 文件指定搜索目录：include/
+vpath %.h include
+# 为 .o文件指定搜索路径：build/
+vpath %.o build
+
+#设置编译器c用gcc，cpp用g++
+CC:=g++
+#-Wall开启警告 -I指定头文件路径 -O优化 -std=c++11指定c++标准版本
+CFLAGS:=-Wall -Iinclude -o2 -std=c++11
+#链接选项（如 `-L` 指定库路径）
+LDFLAGS:= -Llib
+#链接线程库
+LDLIBS:= -lpthread
+
+#源文件文件夹
+SRC_DIR := src
+#可执行文件路径
+OUTPUT_DIR:= output
+#目标文件路径
+BUILD_DIR:= bulid
+#生成的可执行文件名称
+EXE_NAME:= main.exe
+#源文件名称
+SRC := $(wildcard $(SRC_DIR)*.cpp)
+#目标文件名称,.o文件不一定存在，所以用递归展开
+OBJ := $(patsubst %.cpp, %.o, $(SRC)) #OBJ := $(SRC:.cpp=.o)
+
+ifeq ($(OS), Windows_NT)  # Windows 系统
+    RM := del /f /q  # 删除文件命令（/f 强制，/q 静默）
+    RMDIR := rd /s /q  # 删除目录命令（/s 递归删除子目录，/q 静默）
+    MKDIR := mkdir  # 创建目录命令（Windows 下 mkdir 可直接用）
+else  # Linux/macOS 或其他类 Unix 系统
+    RM := rm -f  # 删除文件命令
+    RMDIR := rm -rf  # 删除目录命令（-r 递归，-f 强制）
+    MKDIR := mkdir -p  # 创建目录命令（-p 递归创建）
+endif
+
+#指定默认目标
+all: $(EXE_NAME)
+#链接生成可执行文件 依赖.o文件,目标文件夹，执行文件文件夹
+$(EXE_NAME): $(OBJ) $(BUILD_DIR) $(OUTPUT_DIR)
+	$(CC) $(OBJ) -o $@ $(LDFLAGS) $(LDLIBS)
+	echo 编译完成
+#编译生成目标文件 依赖.cpp文件
+$(BUILD_DIR)/%.o:$(SRC_DIR)/%.cpp
+	$(CC) -c $< -o $@ $(CFLAGS)
+
+$(BUILD_DIR):
+	if not exist "$@" $(MKDIR) "$@"
+$(OUTPUT_DIR):
+	if not exist "$@" $(MKDIR) "$@"
+	
+clean:
+	if exist $(OBJ) $(RM) $(OBJ)
+	if exist $(OUTPUT_DIR)/$(EXE_NAME) $(RM) $(OUTPUT_DIR)/$(EXE_NAME)
+run: all
+	all
+	./$(OUTPUT_DIR)/$(EXE_NAME)
+	echo 执行完毕
+```
+
+### （2）CMake
+
+CMake 是一个跨平台的**构建自动化工具**，它能根据不同操作系统和编译器，生成对应的构建文件（如 Makefile、Visual Studio 解决方案、Xcode 项目等），从而简化跨平台项目的构建流程。
+
+#### ①基本语法
+
+##### a. `cmake_minimum_required(VERSION <version>)`
+
+指定构建当前项目所需的最低 CMake 版本。这是每个 `CMakeLists.txt` 文件都应该放在最开头的指令。
+
+```cmake
+# 在项目的根CMakeLists.txt文件顶部
+cmake_minimum_required(VERSION 3.15)
+```
+
+##### b. `project(<name> [LANGUAGES <lang>...])`
+
+定义项目名称，并可指定项目使用的编程语言（如 C, CXX 即 C++, Fortran 等）。
+
+```cmake
+# 在 cmake_minimum_required 之后
+project(MyAwesomeProject LANGUAGES CXX)
+```
+
+更详细用法
+
+```cmake
+project(
+    MyGameEngine                  # 项目名称
+    VERSION 1.2.3                 # 版本号：1.主版本号，2.次版本号，3.修订号
+    DESCRIPTION "A simple 2D game engine"  # 项目描述
+    HOMEPAGE_URL "https://github.com/yourname/mygameengine" # 主页URL
+    LANGUAGES CXX C               # 支持C++和C语言
+)
+```
+
+##### c. `add_executable(<target_name> <source_files>...)`
+
+定义一个可执行文件目标。CMake 会将指定的源文件编译链接成一个名为 `<target_name>` 的可执行程序。
+
+```cmake
+# 在根 CMakeLists.txt 中
+add_executable(my_app src/main.cpp)
+```
+
+##### d. `add_library(<library_name> <type> <source_files>...)`
+
+定义一个库目标。库可以是静态的（`.a`, `.lib`）、动态的（`.so`, `.dll`）或模块库。
+
+`type`:
+
+- `STATIC`: 静态库。
+- `SHARED`: 动态库 / 共享库。
+- `MODULE`: 模块库（通常用于运行时插件）。
+
+```cmake
+# 在根 CMakeLists.txt 中
+add_library(my_math_lib STATIC
+    src/math/add.cpp
+    src/math/add.h
+)
+```
+
+##### e. `target_link_libraries(<target_name> <PRIVATE|PUBLIC|INTERFACE> <library>...)`
+
+为一个目标（可执行文件或库）链接一个或多个依赖库。这是管理项目依赖关系最重要的指令。
+
+- `PRIVATE`: 被链接的库仅对当前目标内部可见，不传递给依赖于当前目标的其他目标。
+- `PUBLIC`: 被链接的库对当前目标可见，并且会传递给所有依赖于当前目标的其他目标。
+- `INTERFACE`: 被链接的库对当前目标不可见，但会传递给所有依赖于当前目标的其他目标（通常用于头文件库）。
+
+```cmake
+# 在 add_executable(my_app ...) 之后
+target_link_libraries(my_app PRIVATE my_math_lib)
+```
+
+##### f. `target_include_directories(<target_name> <PRIVATE|PUBLIC|INTERFACE> <dir>...)`
+
+为一个目标指定头文件搜索路径。当编译该目标的源文件时，编译器会在这些目录中查找 `#include` 的头文件。
+
+```cmake
+#旧版
+include_directories(dir)
+# 在 add_library(my_math_lib ...) 之后
+target_include_directories(my_math_lib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/math  # 让库自己能找到 add.h
+)
+```
+
+- `${CMAKE_CURRENT_SOURCE_DIR}` 是一个 CMake 内置变量，代表当前 `CMakeLists.txt` 文件所在的目录。
+- 使用 `PUBLIC` 是一个好习惯，它确保了任何链接 `my_math_lib` 的目标（如 `my_app`）都能自动找到 `my_math_lib` 所需的头文件。
+
+##### g. `add_subdirectory(<dir>)`
+
+添加一个子目录到构建中。CMake 会进入该子目录，查找并执行其中的 `CMakeLists.txt` 文件。这是组织大型项目的关键指令。
+
+```cmake
+# 添加子目录，CMake会处理 src/math/CMakeLists.txt
+add_subdirectory(src/math)
+add_subdirectory(src/utils)
+```
+
+##### h. `find_package(<PackageName> [REQUIRED])`
+
+查找一个已安装的第三方软件包（如 Boost, OpenCV, Qt, Eigen 等）。`REQUIRED` 关键字表示如果找不到该包，CMake 会立即停止并报错。
+
+```cmake
+# 在根 CMakeLists.txt 中
+find_package(Boost 1.70 REQUIRED COMPONENTS filesystem system)
+
+# ...
+
+# 在定义了目标之后
+target_link_libraries(my_app PRIVATE
+    my_math_lib
+    Boost::filesystem  # 链接 Boost 的 filesystem 组件
+    Boost::system      # 链接 Boost 的 system 组件
+)
+
+# Boost 的头文件路径通常会通过 IMPORTED 目标自动包含，
+# 所以一般不需要再手动 target_include_directories
+```
+
+##### i.`set(<variable_name> <value>...)`
+
+定义或修改一个 CMake 变量。变量在 CMake 中广泛用于存储路径、源文件列表、编译选项等。
+
+```cmake
+# 定义一个变量来存储源文件列表
+set(APP_SOURCES
+    src/main.cpp
+    src/another_file.cpp
+)
+# 设置 C++ 标准
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+```
+
+②实现一个简单的CMakeLists
+
+假如文件目录下方所示
+
+```plaintext
+MyProject/
+├── CMakeLists.txt         # 主CMake配置文件
+├── src/
+│   ├── main.cpp           # 主程序入口
+│   ├── add.cpp 			# 一个简单的加法函数
+└── include/               # 公共头文件目录 (可选)
+    └── add.h   # 项目配置头文件
+```
+
+CMakeLists.txt应该这样写
+
+```cmake
+# 在项目的根CMakeLists.txt文件顶部
+cmake_minimum_required(VERSION 3.15)
+
+# 在 cmake_minimum_required 之后
+project(MyProject LANGUAGES CXX)
+
+# 设置 C++ 标准
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 在根 CMakeLists.txt 中
+add_executable(app src/main.cpp src/add.cpp)
+
+# 添加 include 目录
+target_include_directories(app PUBLIC include)
+```
+
+③复杂的cmake实现
+
+假如有以下目录的项目
+
+```txt
+MyProject/
+├── CMakeLists.txt         # 主CMake配置文件
+├── src/
+│   ├── main.cpp           # 主程序入口
+│   ├── math/
+│   │   ├── add.cpp        # 一个简单的加法函数
+│   │   └── add.h          # 加法函数的头文件
+│   ├── utils/
+│   │   ├── log.cpp        # 一个简单的日志函数
+│   │   └── log.h          # 日志函数的头文件
+│   └── test/
+│       └── test.cpp       #测试程序1入口
+├── include/               # 公共头文件目录 (可选)
+│       └── project_config.h   # 项目配置头文件
+```
+
+CMakeLists.txt应该这样写
+
+```cmake
+# 在项目的根CMakeLists.txt文件顶部
+cmake_minimum_required(VERSION 3.15)
+
+# 在 cmake_minimum_required 之后
+project(MyProject LANGUAGES CXX)
+
+# 设置 C++ 标准
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# --- 处理共享代码：将 math utils模块编译成静态库 ---
+# 这样做可以避免 app 和 test 都编译一次
+add_library(math_lib STATIC
+    src/math/math.cpp
+    src/math/math.h
+)
+add_library(utils_lib STATIC
+    src/utils/log.cpp
+    src/utils/log.h
+)
+# 为 math utils 设置头文件搜索路径
+# PUBLIC 意味着任何链接此库的目标（如 app test）都会自动获得这个路径
+target_include_directories(math_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/include)
+target_include_directories(utils_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/include)
+# 在根 CMakeLists.txt 中
+add_executable(app src/main.cpp)
+# 链接 math_lib utils_lib 库到 app
+target_link_libraries(main_app PRIVATE math_lib utils_lib)
+# 生成另一个可执行文件
+add_executable(test src/test/test.cpp)
+# 链接 math_lib utils_lib 库到 test
+target_link_libraries(test PRIVATE math_lib utils_lib)
+```
+
+
 
 ## 3、GDB调试
 
 # 七、Linux与网络编程
+
+## 1、socket编程
+
+### （1）TCP/IP
+
+#### ①**TCP/IP 四层模型**
+
+##### **a. 网络接口层（物理层 + 数据链路层）**
+
+- 作用
+
+  ：负责 “物理传输” 和 “相邻设备通信”。
+
+  - 物理层：定义电压、接口等物理特性（如网线、无线信号），传输 “比特流”（0 和 1）。
+  - 数据链路层：将比特流包装成 “帧”（Frame），解决 “同一局域网内设备识别”（通过 MAC 地址）和 “差错检测”（如 CRC 校验）。
+
+- 与编程的关联
+
+  ：几乎不直接操作（由操作系统和网卡驱动处理），但需知道：
+
+  - 局域网内通信依赖 MAC 地址（如 ARP 协议用于 IP 地址转 MAC 地址）。
+  - 帧有长度限制（如以太网 MTU 通常 1500 字节），过大的数据会被分片（影响传输效率）。
+
+##### **b. 网络层：实现 “跨网络通信”**
+
+核心协议：**IP 协议**（IPv4 为主，IPv6 逐步普及），解决 “不同网络间的数据路由” 问题。
+
+- **核心概念**：
+  - **IP 地址**：标识网络中一台主机的 “逻辑地址”（如 IPv4 的`192.168.1.1`，32 位；IPv6 的`2001:db8::1`，128 位）。
+  - **子网与掩码**：通过子网掩码（如`255.255.255.0`）划分网络，区分 “本网段” 和 “跨网段”（跨网段需通过网关转发）。
+  - **路由**：数据从源主机到目标主机的 “路径选择”（由路由器完成，基于路由表）。
+  - **IP 分组**：数据被拆分为 “IP 分组”（Packet）传输，每个分组独立路由（可能走不同路径），接收方再重组。
+- **辅助协议**：
+  - **ICMP**：控制报文协议，用于诊断网络（如`ping`命令基于 ICMP 的 echo 请求 / 应答）。
+  - **ARP**：地址解析协议，将 IP 地址转换为 MAC 地址（同一局域网内通信需要）。
+- **与编程的关联**：
+  - 网络编程中需指定目标 IP 地址（如`connect()`函数需要 IP）。
+  - 需处理 IP 分组分片（但通常由操作系统内核处理，应用层无需关心）。
+
+##### **c. 传输层：实现 “进程间通信”**
+
+核心协议：**TCP**和**UDP**，是网络编程的 “核心战场”，负责 “端到端” 的数据传输（区分同一主机上的不同进程）。
+
+**（1）端口（Port）：进程的 “门牌号”**
+
+- 一台主机有 65536 个端口（0-65535），用于区分同一主机上的不同进程（如 HTTP 默认 80，SSH 默认 22）。
+- 网络通信的 “四元组”：`(源IP, 源端口, 目标IP, 目标端口)`，唯一标识一个网络连接。
+
+**（2）TCP：可靠的 “字节流” 传输**
+
+TCP（Transmission Control Protocol，传输控制协议）是 “面向连接、可靠、有序” 的协议，适合对数据准确性要求高的场景（如文件传输、HTTP）。
+
+- **核心特性**：
+
+  - **面向连接**：通信前必须建立连接（三次握手），结束后释放连接（四次次挥手）。
+  - **可靠传输**：
+    - 确认机制：接收方收到数据后发送 ACK 确认，发送方未收到 ACK 则重传。
+    - 序列号：保证数据有序序（接收方按序号重组）。
+    - 超时重传：发送方等待超时后重传未确认数据。
+  - **流量控制**：通过 “滑动窗口” 限制发送速率，避免接收方缓冲区溢出（接收方告知自己的窗口大小）。
+  - **拥塞控制**：通过慢启动、拥塞避免等算法，避免网络因数据过多而拥塞。
+
+- **三次握手（建立连接）**：
+
+  1. 客户端 → 服务器：SYN（请求建立连接，带初始序列号 seq=x）。
+
+  2. 服务器 → 客户端：SYN+ACK（同意连接，seq=y，确认 ACK=x+1）。
+
+  3. 客户端 → 服务器：ACK（确认收到，ACK=y+1）。
+
+     （为什么三次？确保双方 “发送” 和 “接收” 能力都正常）
+
+- **四次挥手（释放连接）**：
+
+  1. 客户端 → 服务器：FIN（请求关闭，seq=u）。
+
+  2. 服务器 → 客户端：ACK（确认关闭，ACK=u+1）。
+
+  3. 服务器 → 客户端：FIN（服务器也准备关闭，seq=v）。
+
+  4. 客户端 → 服务器：ACK（确认，ACK=v+1）。
+
+     （为什么四次？因为服务器可能还有数据要发送，不能立即发 FIN）
+
+- **与编程的关联**：
+
+  - TCP 编程需严格遵循 “连接→通信→关闭” 流程（`listen()`/`connect()`/`accept()`）。
+  - 数据是 “流式” 的（无边界），会导致 “粘包” 问题（需应用层设计协议解决）。
+
+**（3）UDP：高效的 “数据报” 传输**
+
+UDP（User Datagram Protocol，用户数据报协议）是 “无连接、不可靠、无序” 的协议，适合对实时性要求高的场景（如视频通话、游戏、DNS）。
+
+- **核心特性**：
+  - **无连接**：通信前无需建立连接，直接发送数据（速度快）。
+  - **不可靠**：不保证送达，无确认、无重传（可能丢包、乱序）。
+  - **数据报**：每次发送是一个独立 “数据报”（有边界），大小受限（通常不超过 1500 字节，避免分片）。
+- **与编程的关联**：
+  - UDP 编程无需`listen()`/`accept()`，直接用`recvfrom()`/`sendto()`收发（需指定目标 IP 和端口）。
+  - 应用层需自己处理丢包、重传（如实时游戏中可忽略旧数据，或加简单确认机制）。
+
+##### **d. 应用层：定义 “数据格式和交互逻辑”**
+
+应用层协议基于 TCP 或 UDP，定义 “数据如何解析” 和 “双方如何交互”（如 HTTP 的请求 / 响应格式）。
+
+- **常见协议**：
+  - **HTTP**：基于 TCP，用于网页传输（请求方法 GET/POST、状态码 200/404 等）。
+  - **FTP**：基于 TCP，用于文件传输（控制连接 + 数据连接）。
+  - **DNS**：基于 UDP，用于域名解析（将`www.baidu.com`转为 IP）。
+  - **SMTP/POP3**：基于 TCP，用于邮件发送和接收。
+- **与编程的关联**：
+  - 网络编程常需实现应用层协议的客户端 / 服务器（如写一个简单 HTTP 服务器，解析 GET 请求并返回数据）。
+  - 自定义协议时，需设计数据格式（如 “头部 + 数据”，头部包含长度、类型等信息）。
+
+#### ②传输层
+
+##### a.传输层的核心功能
+
+1. **进程标识：通过端口号区分同一主机上的不同进程**
+
+   网络层的 IP 地址只能定位到 “主机”，但一台主机上可能有多个网络进程（如浏览器、微信、邮件客户端），传输层通过**端口号（Port）** 区分这些进程。
+
+   - 端口号是 16 位整数（范围 0-65535），其中：
+     - 0-1023：知名端口（如 HTTP 用 80，HTTPS 用 443，SSH 用 22），由 IANA 分配，用于标准化服务；
+     - 1024-49151：注册端口，用于特定应用（需 MySQL 用 3306）；
+     - 49152-65535：动态端口，由操作系统临时态态分配给临时进程（如客户端程序）。
+   - 网络通信的 “四元组”（源 IP、源端口、目标 IP、目标端口）唯一标识一个网络连接，确保数据准确送达目标进程。
+
+2. **提供两种核心传输服务：可靠传输与高效传输**
+
+   不同应用对传输的需求不同（如文件传输需要 “可靠不丢包”，视频通话需要 “快速实时”），传输层通过两种协议满足需求：
+
+   - **TCP（传输控制协议）**：提供 “可靠、有序、面向连接” 的传输服务；
+   - **UDP（用户数据报协议）**：提供 “不可靠、无序、无连接” 的高效传输服务。
+
+3. **数据分片与重组**
+
+   网络层的 IP 分组有长度限制（受 MTU 限制，通常≤1500 字节），如果传输层的数据过大（如 10KB），会被拆分为多个 “段”（TCP）或 “数据报”（UDP），通过 IP 分组传输，接收方传输层再重组为完整数据。
+
+4. **流量控制与拥塞控制（仅 TCP）**
+
+   - 流量控制：防止发送方发送送速度过快，导致接收方缓冲区溢出（通过 “滑动窗口” 实现）；
+   - 拥塞控制：防止发送方数据量过大，导致网络拥塞（通过慢启动、拥塞避免等算法法）。
+
+##### b.核心协议 1：TCP（Transmission Control Protocol，传输控制协议）
+
+TCP 是 “面向连接、可靠传输” 的协议，是大多数网络应用的首选（如 HTTP、FTP、邮件等），核心特点是 “确保数据不丢失、不重复、按序到达”。
+
+**1. 核心特性：面向连接**
+
+TCP 通信前必须通过 “三次握手” 建立连接，通信结束后通过 “四次挥手” 释放连接，类似 “打电话话前先拨号，结束后挂电话”。
+
+- **三次握手手（建立连接）**：确保双方方 “发送” 和 “接收” 能力均正常。
+
+  1. 客户端 → 服务器：发送 SYN（同步始请求），携带初始始序列号 seq=x；
+
+  2. 服务器 → 客户端：回复 SYN+ACK（同意连接），携带带 seq=y，确认 ACK=x+1；
+
+  3. 客户端 → 服务器：回复 ACK（确认收到同意），携带 ACK=y+1。
+
+     
+
+     （为什么什么三次三次次？前两次可确认 “客户端能发，服务器能收 + 发”，第三次确认 “服务器能收”，缺一不可。）
+
+- **四次挥手（释放连接）**：确保双方数据均传输完毕。
+
+  1. 客户端 → 服务器：发送 FIN（请求关闭），seq=u；
+
+  2. 服务器 → 客户端：回复 ACK（确认关闭请求），ACK=u+1；（此时服务器可能仍有数据要发）
+
+  3. 服务器 → 客户端：发送 FIN（服务器也准备关闭），seq=v；
+
+  4. 客户端 → 服务器：回复 ACK（确认服务器关闭），ACK=v+1。
+
+     
+
+     （为什么四次？服务器收到关闭请求后，可能还有未发完的数据，需先确认请求，再发完数据后主动关闭，因此分两步。）
+
+**2. 核心特性：可靠传输**
+
+TCP 通过多种列机制确保数据可靠：
+
+- **序列号列号与确认号**：
+
+  - 发送方给每个字节分配唯一序列号（如首字节 seq=100，发送 50 字节，则下次 seq=150）；
+  - 接收方收到数据后，回复送 “确认号”（ACK = 期望收到的下一字节序列号），表示 “已收到前序所有数据”。
+
+- **超时重传**：
+
+  发送方若在超时时间内未收到确认，会重传未确认的数据（超时时间动态调整，避免网络拥堵时无效重传）。
+
+- **重传机制优化**：
+
+  - 快速重传：若收到 3 个重复确认（如连续收到 ACK=100），说明中间数据丢失，立即重传，无需等待超时；
+  - 选择性重传：仅重传丢失的分片，而非重传所有数据（提高效率）。
+
+**3. 流量控制：滑动窗口机制**
+
+接收方通过 “窗口大小” 告诉发送方 “自己当前缓冲区还能接收多少数据”，发送方根据窗口大小调整发送速度，避免接收方溢出。
+
+- 窗口大小随接收方缓冲区使用情况动态变化（如接收方处理数据后，窗口增大）；
+- 若窗口大小为 0，发送方停止发送，等待接收方更新窗口（通过 “窗口探查” 报文触发）。
+
+**4. 拥塞控制：避免网络过载**
+
+TCP 通过以下算法避免因发送数据过多多导致的网络拥塞（如路由器缓存满、丢包）：
+
+- **慢启动**：初始发送窗口很小（如 1-2 个分组），每收到确认就翻倍，快速增长到 “慢启动阈值”；
+- **拥塞避免**：超过过慢启动阈值后，窗口缓慢增长（每次 + 1），降低低网络突然过载；
+- **拥塞发生**：若检测到丢包（超时或 3 次重复确认），则降低阈值，重新慢启动。
+
+**5. TCP 的 “粘包” 问题**
+
+TCP 是 “流式传输”（无数据边界），多次发送的小数据可能被合并为一个大段发送（Nagle 算法优化），导致接收方无法区分 “哪次发送对应应哪部分数据”，即 “粘包”。
+
+- 解决方法：应用层协议需设计边界（如固定长度头、分隔符、长度字段 + 数据）。
+
+##### c.核心协议 2：UDP（User Datagram Protocol，用户数据报协议）
+
+UDP 是 “无连接、不可靠” 的协议，不保证数据送达，也不保证顺序，但胜在**速度快、开销小**，适合实时性要求高的场景（如视频通话、游戏、DNS）。
+
+**1. 核心特性：无连接**
+
+UDP 通信前无需建立连接，发送方直接通过 “数据报” 发送数据（类似 “邮寄信件”，写对地址就发，不管管对方方是否准备好），因此：
+
+- 发送效率高（省去握手 / 挥手开销）；
+- 不保证对方收到（可能因网络拥堵丢包）；
+- 数据可能乱序（不同数据报走不同路由）。
+
+2. **核心特性：数据报 oriented**
+
+UDP 的数据是 “有边界” 的：发送方调用一次`sendto()`发送的 “数据报”，接收方调用一次`recvfrom()`就能完整接收，不会像 TCP 那样粘包。
+
+- 数据报大小受限（通常≤1500 字节，超过会被 IP 层分片，影响效率）。
+
+3. **UDP 的适用场景**
+
+- 实时性优先：视频 / 音频通话（丢几帧不影响，重传反而会导致延迟）；
+- 简单请求响应：DNS 解析（查询报文小，一次请求一次回复）；
+- 广播 / 组播：如局域网内设备发现（UDP 支持广播，TCP 不支持）。
+
+### (2)TCP通讯步骤
+
+```mermaid
+graph TD
+subgraph 服务端
+		E["1.创建流式socket()"]-->F["2.指定用于通信的IP地址和端口bind()"]
+		F-->G["3.把socket设置为监听模式listen()"]
+		G-->H["4.接收客户端的连接accept()"]
+		H-->I["5.发送接收数据send()/recv()"]
+		I-->J["6.关闭socket连接，释放资源close()"]
+	end
+
+subgraph 客户端
+        A["1.创建流式socket()"] --> B["2.向服务器发起连接请求connect()"]
+        B --> C["3.发送接收数据send()/recv()"]
+        C --> D["4.关闭socket连接，释放资源close()"]
+        I-->C
+		C-->I
+    end
+```
+
+#### 步骤 1：服务器端初始化（绑定端口 + 监听连接）
+
+服务器需要先 “绑定” 一个端口并 “监听”，等待客户端连接。
+
+| 步骤              | 系统调用                                                     | 作用                                         |
+| ----------------- | ------------------------------------------------------------ | -------------------------------------------- |
+| 1. 创建 Socket    | `int socket(int domain, int type, int protocol);`            | 创建一个 Socket 文件描述符                   |
+| 2. 绑定 IP 和端口 | `int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);` | 将 Socket 与本地 IP + 端口绑定               |
+| 3. 监听连接       | `int listen(int sockfd, int backlog);`                       | 将 Socket 转为 “被动监听” 状态，等待连接     |
+| 4. 接受客户端连接 | `int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);` | 阻塞等待客户端连接，返回新的 Socket 用于通信 |
+
+#### 步骤 2：客户端初始化（发起连接）
+
+客户端不需要绑定固定端口（系统会自动分配临时端口），直接向服务器发起连接。
+
+| 步骤           | 系统调用                                                     | 作用                                         |
+| -------------- | ------------------------------------------------------------ | -------------------------------------------- |
+| 1. 创建 Socket | `socket()` （同服务器）                                      | 创建客户端 Socket                            |
+| 2. 发起连接    | `int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);` | 向服务器的 IP + 端口发起连接（触发三次握手） |
+
+#### 步骤 3：数据传输（双向通信）
+
+连接建立后，服务器（通过 `accept()` 返回的新 Socket）和客户端（通过自己的 Socket）可双向读写数据。
+
+| 操作   | 系统调用                                                     | 作用                                   |
+| ------ | ------------------------------------------------------------ | -------------------------------------- |
+| 读数据 | `ssize_t recv(int sockfd, void *buf, size_t len, int flags);` | 从 Socket 读取数据（`flags` 通常为 0） |
+| 写数据 | `ssize_t send(int sockfd, const void *buf, size_t len, int flags);` | 向 Socket 写入数据（`flags` 通常为 0） |
+
+#### 步骤 4：关闭连接（释放资源）
+
+通信结束后，需关闭 Socket 释放文件描述符（触发四次挥手）。
+
+| 步骤        | 系统调用             | 作用                        |
+| ----------- | -------------------- | --------------------------- |
+| 关闭 Socket | `int close(int fd);` | 关闭 Socket，释放连接和资源 |
+
+### (3)UDP通讯步骤
+
+```mermaid
+graph TD
+subgraph 服务端
+		E["1.创建流式socket()"]-->F["2.指定用于通信的IP地址和端口bind()"]
+		F-->I["3.发送接收数据sendto()/recvfrom() 需指定ip端口"]
+		I-->J["4.关闭socket连接，释放资源close()"]
+	end
+
+subgraph 客户端
+        A["1.创建流式socket()"] --> C["2.发送接收数据sendto()/recvfrom() 需指定ip端口"]
+        C --> D["3.关闭socket连接，释放资源close()"]
+        I-->C
+		C-->I
+    end
+```
+
+UDP 是 “无连接” 协议，无需建立连接，直接发送数据，流程更简单（无监听 / 接受步骤）。
+
+#### 步骤 1：服务器端初始化（仅绑定端口）
+
+UDP 服务器器只需绑定端口，无需监听，直接等待数据。
+
+| 步骤              | 系统调用                          | 作用                                                   |
+| ----------------- | --------------------------------- | ------------------------------------------------------ |
+| 1. 创建 Socket    | `socket(AF_INET, SOCK_DGRAM, 0);` | 创建 UDP Socket（SOCK_DGRAM 表示数据报）               |
+| 2. 绑定 IP 和端口 | `bind()` （同 TCP）               | 绑定本地 IP + 端口（必须绑定，否则客户端不知道发给谁） |
+
+#### 步骤 2：客户端初始化（无需连接）
+
+UDP 客户端无需连接，直接发送数据（需指定服务器的 IP + 端口）。
+
+| 步骤           | 系统调用                          | 作用            |
+| -------------- | --------------------------------- | --------------- |
+| 1. 创建 Socket | `socket(AF_INET, SOCK_DGRAM, 0);` | 创建 UDP Socket |
+
+#### 步骤 3：数据传输（收发需指定地址）
+
+UDP 无连接，每次收发都需明确对方的 IP + 端口。
+
+| 操作     | 系统调用                                                     | 作用                         |
+| -------- | ------------------------------------------------------------ | ---------------------------- |
+| 接收数据 | `ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);` | 接收数据，并获取发送方的地址 |
+| 发送数据 | `ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);` | 向指定地址发送数据           |
+
+#### 步骤 4：关闭 Socket
+
+同 TCP，用 `close()` 关闭 Socket 即可。
+
+### (4)所需头文件
+
+```c++
+#include <sys/socket.h>       // socket()、bind()等核心函数
+#include <netinet/in.h>       // sockaddr_in地址结构
+#include <arpa/inet.h>        // inet_pton()、htons()等转换函数
+#include <unistd.h>           // close()、read()、write()
+```
+
+##### ①`sys/socket.h`
+
+`sys/socket.h`包含`socket()`、`bind()`、`accept()`、`recv()`/`send()`、`recvfrom()`/`sendto()`和常量
+
+###### a. `socket()`：创建套接字
+
+**作用**：创建一个套接字（网络通信的 “端点”），返回文件描述符（后续操作通过该描述符进行）。
+
+**原型**：
+
+```c
+int socket(int domain, int type, int protocol);
+```
+
+**参数**：
+
+- `domain`：协议族（如 `AF_INET` 表示 IPv4）；
+- `type`：套接字类型（`SOCK_STREAM` 表示 TCP 流式套接字）；
+- `protocol`：传输协议（通常传 0，让系统自动匹配 `type` 对应的默认协议，如 `SOCK_STREAM` 对应 `IPPROTO_TCP`）。
+
+**示例**（创建 TCP 套接字）：
+
+```cpp
+int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+if (listen_fd == -1) {
+    perror("socket 创建失败"); // 打印错误原因（依赖 <stdio.h>）
+    exit(1);
+}
+```
+
+###### b. `bind()`：绑定本地地址（IP + 端口）
+
+**作用**：将套接字与本地的 “IP 地址 + 端口号” 绑定（服务器必须绑定，客户端可选，系统会自动分配临时端口）。
+
+**原型**：
+
+```c
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+```
+
+**参数**：
+
+- `sockfd`：`socket()` 返回的套接字描述符；
+- `addr`：通用地址结构指针（需传入具体协议族的地址结构，如 `struct sockaddr_in` 并强制转换）；
+- addrlen：地址结构的大小（sizeof(addr)）。
+
+**返回值**：成功返回 0，失败返回 -1。
+
+**示例**（服务器绑定 8888 端口，监听所有本地 IP）：
+
+```cpp
+struct sockaddr_in serv_addr;
+memset(&serv_addr, 0, sizeof(serv_addr)); // 初始化，清零填充字段 sin_zero
+serv_addr.sin_family = AF_INET;           // IPv4 协议族
+serv_addr.sin_port = htons(8888);         // 端口号（需转为网络字节序）
+serv_addr.sin_addr.s_addr = htonl(INADDR_ANY); // 绑定所有本地 IP（0.0.0.0）
+
+// 绑定地址（注意强制转换为通用地址结构）
+if (bind(listen_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
+    perror("bind 失败");
+    close(listen_fd); // 失败时关闭套接字
+    exit(1);
+}
+```
+
+###### c. `listen()`：转为监听状态（仅 TCP 服务器）
+
+**作用**：将套接字从 “主动” 转为 “被动监听” 状态，允许接收客户端连接请求，同时设置等待连接队列的最大长度。
+
+**原型**：
+
+```c
+int listen(int sockfd, int backlog);
+```
+
+**参数**：
+
+- `sockfd`：绑定后的套接字描述符；
+- `backlog`：等待连接队列的最大长度（超过的连接会被拒绝，通常设为 5~10）。
+
+**返回值**：成功返回 0，失败返回 -1。
+
+**示例**：
+
+```cpp
+if (listen(listen_fd, 5) == -1) { // 最多允许 5 个等待连接
+    perror("listen 失败");
+    close(listen_fd);
+    exit(1);
+}
+```
+
+###### d. `accept()`：接受客户端连接（仅 TCP 服务器）
+
+**作用**：阻塞等待客户端的连接请求，成功后返回一个**新的套接字描述符**（用于与该客户端单独通信），同时获取客户端的地址。
+
+**原型**：
+
+```c
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+```
+
+**参数**：
+
+- `sockfd`：`listen()` 后的监听套接字；
+- `addr`：输出参数，用于存储客户端的地址（需传入 `struct sockaddr_in*` 并强制转换）；
+- addrlen：输入输出参数，传入 addr 的大小（sizeof(addr)），输出实际地址长度。
+
+**返回值**：成功返回新的通信套接字，失败返回 -1。
+
+**示例**：
+
+```cpp
+struct sockaddr_in client_addr;
+socklen_t client_len = sizeof(client_addr);
+// 阻塞等待连接，获取客户端地址
+int conn_fd = accept(listen_fd, (struct sockaddr*)&client_addr, &client_len);
+if (conn_fd == -1) {
+    perror("accept 失败");
+    close(listen_fd);
+    exit(1);
+}
+// 打印客户端信息（需转换 IP 和端口为本地字节序）
+char client_ip[INET_ADDRSTRLEN];
+inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+printf("客户端连接：%s:%d\n", client_ip, ntohs(client_addr.sin_port));
+```
+
+###### e. `connect()`：客户端发起连接（仅 TCP 客户端）
+
+**作用**：向服务器发送连接请求（触发三次握手），建立 TCP 连接。
+
+**原型**：
+
+```c
+int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+```
+
+**参数**：
+
+- `sockfd`：客户端套接字描述符；
+- `addr`：服务器的地址结构（`struct sockaddr_in` 强制转换）；
+- `addrlen`：服务器地址结构的大小。
+
+**返回值**：成功返回 0（连接建立），失败返回 -1（如服务器未启动、网络不通）。
+
+**示例**（客户端连接本地 8888 端口的服务器）：
+
+```cpp
+int client_fd = socket(AF_INET, SOCK_STREAM, 0); // 创建客户端套接字
+if (client_fd == -1) { /* 错误处理 */ }
+
+struct sockaddr_in serv_addr;
+memset(&serv_addr, 0, sizeof(serv_addr));
+serv_addr.sin_family = AF_INET;
+serv_addr.sin_port = htons(8888);
+// 将服务器 IP 字符串（如 "127.0.0.1"）转为二进制
+inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
+
+// 发起连接
+if (connect(client_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
+    perror("connect 失败");
+    close(client_fd);
+    exit(1);
+}
+```
+
+###### f. `send()`/`recv()`：TCP 收发数据
+
+- `send()`：向已连接的套接字发送数据；
+- `recv()`：从已连接的套接字接收数据（阻塞等待数据到达）。
+
+**原型**：
+
+```c
+ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+```
+
+**参数**：
+
+- `sockfd`：`accept()` 返回的通信套接字（服务器）或 `connect()` 后的客户端套接字；
+- `buf`：发送 / 接收数据的缓冲区；
+- `len`：要发送 / 接收的数据长度；
+- `flags`：操作标志（通常传 `0`，表示默认行为；`MSG_OOB` 表示紧急数据）。
+- `send()`：成功返回实际发送的字节数（可能小于 `len`），失败返回 `-1`；
+- `recv()`：成功返回实际接收的字节数（`0` 表示对方关闭连接），失败返回 `-1`。
+
+**示例**（服务器接收并回复数据）：
+
+```cpp
+char recv_buf[1024];
+// 接收客户端数据（阻塞）
+ssize_t n = recv(conn_fd, recv_buf, sizeof(recv_buf)-1, 0);
+if (n <= 0) {
+    if (n == 0) printf("客户端已关闭\n");
+    else perror("recv 失败");
+    close(conn_fd);
+    exit(1);
+}
+recv_buf[n] = '\0'; // 手动添加字符串结束符
+printf("收到：%s\n", recv_buf);
+
+// 回复客户端
+std::string reply = "服务器收到：" + std::string(recv_buf);
+send(conn_fd, reply.c_str(), reply.size(), 0);
+```
+
+###### g. `close()`：关闭套接字
+
+**作用**：释放套接字资源，终止连接（触发四次挥手）。
+
+**原型**：
+
+```c
+int close(int fd);
+```
+
+**示例**：
+
+```cpp
+close(conn_fd);    // 关闭与客户端的通信套接字
+close(listen_fd);  // 服务器关闭监听套接字（停止接受新连接）
+```
+
+###### h. `sendto()`/`recvfrom()`
+
+- `sendto()`：发送数据时需指定目标地址（因为 UDP 无连接）；
+- `recvfrom()`：接收数据时可同时获取发送方的地址。
+
+**原型**：
+
+```c
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, 
+               const struct sockaddr *dest_addr, socklen_t addrlen);
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, 
+                 struct sockaddr *src_addr, socklen_t *addrlen);
+```
+
+**参数**：
+
+- `dest_addr`（`sendto`）：目标地址结构；
+- `src_addr`（`recvfrom`）：输出参数，发送方的地址；
+- 其他参数同 `send()`/`recv()`。
+
+**示例**（UDP 服务器接收并回复）：
+
+```cpp
+char buf[1024];
+struct sockaddr_in client_addr;
+socklen_t client_len = sizeof(client_addr);
+
+// 接收数据（阻塞），同时获取客户端地址
+ssize_t n = recvfrom(sock_fd, buf, sizeof(buf)-1, 0, 
+                    (struct sockaddr*)&client_addr, &client_len);
+if (n == -1) { /* 错误处理 */ }
+buf[n] = '\0';
+printf("收到 %s:%d 的数据：%s\n", 
+       inet_ntoa(client_addr.sin_addr), // 转换客户端 IP
+       ntohs(client_addr.sin_port),     // 转换客户端端口
+       buf);
+
+// 回复客户端（需指定客户端地址）
+std::string reply = "服务器收到：" + std::string(buf);
+sendto(sock_fd, reply.c_str(), reply.size(), 0, 
+       (struct sockaddr*)&client_addr, client_len);
+```
+
+**示例**（UDP 客户端发送数据）：
+
+```cpp
+int sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+struct sockaddr_in serv_addr;
+memset(&serv_addr, 0, sizeof(serv_addr));
+serv_addr.sin_family = AF_INET;
+serv_addr.sin_port = htons(8888);
+inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
+
+// 发送数据到服务器
+std::string msg = "Hello UDP";
+sendto(sock_fd, msg.c_str(), msg.size(), 0, 
+       (struct sockaddr*)&serv_addr, sizeof(serv_addr));
+
+// 接收服务器回复
+char reply[1024];
+socklen_t serv_len = sizeof(serv_addr);
+recvfrom(sock_fd, reply, sizeof(reply)-1, 0, 
+         (struct sockaddr*)&serv_addr, &serv_len);
+```
+
+###### i.常量
+
+- 套接字类型常量（`socket()` 函数的 `type` 参数）
+
+  | 常量          | 含义         | 特点与用途                                                   |
+  | ------------- | ------------ | ------------------------------------------------------------ |
+  | `SOCK_STREAM` | 流式套接字   | 面向连接、可靠传输（如 TCP），无数据边界，适合大文件传输。   |
+  | `SOCK_DGRAM`  | 数据报套接字 | 无连接、不可靠（如 UDP），有数据边界，适合实时通信（视频、游戏）。 |
+  | `SOCK_RAW`    | 原始套接字   | 直接操作底层协议（如 IP 分组、以太网帧），用于抓包、自定义协议。 |
+
+- 协议族（地址族）常量（`socket()` 函数的 `domain` 参数）
+
+  | 常量        | 含义                           | 对应地址结构          | 通信范围             |
+  | ----------- | ------------------------------ | --------------------- | -------------------- |
+  | `AF_INET`   | IPv4 协议族                    | `struct sockaddr_in`  | 跨网络（IPv4）通信   |
+  | `AF_INET6`  | IPv6 协议族                    | `struct sockaddr_in6` | 跨网络（IPv6）通信   |
+  | `AF_UNIX`   | 本地 UNIX 协议族（`AF_LOCAL`） | `struct sockaddr_un`  | 同一主机内进程通信   |
+  | `AF_PACKET` | 链路层协议族                   | `struct sockaddr_ll`  | 直接操作链路层数据包 |
+
+- 套接字操作标志（`send()`/`recv()` 等函数的 `flags` 参数）
+
+  | 常量          | 含义                                              |
+  | ------------- | ------------------------------------------------- |
+  | `MSG_OOB`     | 发送 / 接收带外数据（紧急数据）                   |
+  | `MSG_PEEK`    | 接收数据但不从缓冲区移除（预览）                  |
+  | `MSG_WAITALL` | `recv()` 等待接收全部请求数据（阻塞直到满足长度） |
+
+##### ②`netinet/in.h`
+
+`netinet/in.h`是 Linux 网络编程中**定义 IPv4/IPv6 协议相关核心数据结构和常量**的头文件。
+
+**结构体结构**
+
+```c++
+/*
+ipv4
+*/
+struct in_addr {
+    in_addr_t s_addr;  // 32 位无符号整数，存储 IPv4 地址（网络字节序）
+};
+
+struct sockaddr_in {
+    sa_family_t     sin_family;   // 协议族（必须为 AF_INET，标识 IPv4）
+    in_port_t       sin_port;     // 端口号（16 位，必须用 htons() 转换为网络字节序）
+    struct in_addr  sin_addr;     // IPv4 地址（32 位，网络字节序，由 inet_pton() 转换）
+    unsigned char   sin_zero[8];  // 填充字段（必须设为 0，用于与通用地址结构对齐）
+};
+
+/*
+ipv6
+*/
+struct sockaddr_in6 {
+    sa_family_t     sin6_family;   // 协议族（AF_INET6，标识 IPv6）
+    in_port_t       sin6_port;     // 端口号（网络字节序）
+    uint32_t        sin6_flowinfo; // 流信息（用于 QoS 控制）
+    struct in6_addr sin6_addr;     // IPv6 地址（128 位，网络字节序）
+    uint32_t        sin6_scope_id; // 作用域 ID（用于链路本地地址）
+};
+```
+
+**`sin_zero[8]`**
+
+使 IPv4 地址结构 `struct sockaddr_in` 的总大小为 16 字节，与通用地址结构 `struct sockaddr` 一致；
+
+因此初始化`sockaddr_in`前需要执行清零操作
+
+```c++
+struct sockaddr_in serv_addr;
+memset(&serv_addr, 0, sizeof(serv_addr)); // 整体清零，包括 sin_zero
+serv_addr.sin_family = AF_INET;
+// ... 其他字段初始化
+```
+
+**包含的常量**
+
+- **协议族**
+
+  | 协议族       | 通信范围       | 核心用途                           | 典型场景                   |
+  | ------------ | -------------- | ---------------------------------- | -------------------------- |
+  | `AF_INET`    | 跨网络（IPv4） | 互联网通信（网页、App 联网等）     | TCP/UDP Socket 编程        |
+  | `AF_INET6`   | 跨网络（IPv6） | IPv6 环境下的网络通信              | 新一代互联网应用           |
+  | `AF_UNIX`    | 同一主机内     | 本地进程间高效通信                 | 浏览器与本地代理、服务程序 |
+  | `AF_PACKET`  | 链路层         | 底层数据包操作（抓包、自定义协议） | `tcpdump`、网络测试工具    |
+  | `AF_NETLINK` | 用户态与内核态 | 系统配置、事件通知                 | 网络管理工具               |
+
+- ##### IPv4 地址相关常量
+
+  | 常量               | 含义                           | 数值（主机字节序） | 用途                                  |
+  | ------------------ | ------------------------------ | ------------------ | ------------------------------------- |
+  | `INADDR_ANY`       | 绑定本地所有可用 IPv4 地址     | `0.0.0.0`          | 服务器绑定端口时使用，无需指定具体 IP |
+  | `INADDR_LOOPBACK`  | 本地回环地址（仅本机访问）     | `127.0.0.1`        | 本机进程间通信（如测试服务器）        |
+  | `INADDR_BROADCAST` | 广播地址（对局域网内所有主机） | `255.255.255.255`  | 向局域网内所有主机发送广播消息        |
+
+- **IPv6 地址相关常量**
+
+  | 常量                    | 含义                               | 用途                                                     |
+  | ----------------------- | ---------------------------------- | -------------------------------------------------------- |
+  | `IN6ADDR_ANY_INIT`      | IPv6 任意地址（绑定所有本地 IPv6） | 初始化 `struct in6_addr` 为 `::`（IPv6 版 `0.0.0.0`）    |
+  | `IN6ADDR_LOOPBACK_INIT` | IPv6 回环地址                      | 初始化 `struct in6_addr` 为 `::1`（IPv6 版 `127.0.0.1`） |
+
+- **传输层协议标识常量**
+
+  | 常量           | 含义        | 对应协议         | 用途                                      |
+  | -------------- | ----------- | ---------------- | ----------------------------------------- |
+  | `IPPROTO_TCP`  | TCP 协议    | 传输控制协议     | 创建 TCP 套接字（`SOCK_STREAM` 配合使用） |
+  | `IPPROTO_UDP`  | UDP 协议    | 用户数据报协议   | 创建 UDP 套接字（`SOCK_DGRAM` 配合使用）  |
+  | `IPPROTO_ICMP` | ICMP 协议   | 网络控制消息协议 | 创建原始套接字（如 `ping` 命令底层）      |
+  | `IPPROTO_IP`   | IP 协议本身 | 互联网协议       | 通常不直接使用，作为默认协议标识          |
+
+- **端口相关常量**
+
+  | 常量         | 含义             | 用途                                                         |
+  | ------------ | ---------------- | ------------------------------------------------------------ |
+  | `INPORT_ANY` | 自动分配临时端口 | 客户端 Socket 不指定固定端口时使用（系统自动分配 49152-65535 范围内的端口） |
+
+- **其他辅助常量**
+
+  | 常量              | 含义                  | 数值 | 用途                                   |
+  | ----------------- | --------------------- | ---- | -------------------------------------- |
+  | `IPV6_ADDRFORM`   | IPv6 地址格式转换控制 |      | 用于 `setsockopt()` 配置 IPv6 地址选项 |
+  | `IPV6_JOIN_GROUP` | 加入 IPv6 多播组      |      | 多播通信中用于加入指定组播地址         |
+
+- **实际使用**
+
+  ```c++
+  int tcp_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); // 显式指定 TCP 协议
+  
+  int udp_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);  // 显式指定 UDP 协议
+  ```
+
+##### ③`arpa/inet.h`
+
+`arpa/inet.h`中主要包含**字节序转换函数**（解决主机字节序与网络字节序的差异）和**IP 地址格式转换函数**（解决字符串 IP 与二进制 IP 的转换）。
+
+网络协议规定：**网络字节序为 “大端序”**（高位字节存低地址），而主机字节序可能是大端或小端（取决于 CPU 架构，如 x86 是小端）。端口号（16 位）和 IP 地址（32 位 IPv4）必须转换为网络字节序才能在网络中传输，因此需要`arpa/inet.h`对主机字节序和字符串ip进行转换。
+
+**主要函数：**
+
+- 端口转换：
+  - `uint16_t htons(uint16_t hostshort);`主机字节序（16 位）→ 网络字节序:端口号转换（如 `8080` → 网络字节序）
+  - `uint16_t ntohs(uint16_t netshort);`网络字节序（16 位）→ 主机字节序：从网络接收的端口号转换为本地可读
+
+- ip转换：
+  - `uint32_t htonl(uint32_t hostlong);`主机字节序（32 位）→ 网络字节序:IPv4 地址转换（如 `0xc0a80101` → 网络字节序）
+  - `uint32_t ntohl(uint32_t netlong);`网络字节序（32 位）→ 主机字节序：从网络接收的 IPv4 地址转换为本地可读
+  - `inet_pton()`；字符串 IP 到二进制 IP
+  - `inet_ntop()`；二进制 IP 到字符串 IP
+
+**示例:**
+
+```c++
+struct sockaddr_in addr;
+addr.sin_port = htons(8888); // 正确：8888（主机序）→ 网络序
+/*
+af：地址族（AF_INET 对应 IPv4，AF_INET6 对应 IPv6）；
+src：输入的字符串 IP（如 "127.0.0.1"）；
+dst：输出的二进制 IP 缓冲区（IPv4 用 struct in_addr*，IPv6 用 struct in6_addr*）。
+size：dst 的大小（需足够容纳下字符串，IPv4 可用 INET_ADDRSTRLEN，IPv6 用 INET6_ADDRSTRLEN）。
+*/
+int inet_pton(int af, const char *src, void *dst);
+
+const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
+```
+
+#### (5)封装SOCKET
+
+```c++
+class Socket{
+        private:
+                int m_sockfd;//socket文件标志符
+                struct sockaddr_in m_addr;
+        public:
+                Socket();//构造函数：1、创建socket
+
+                Socket(int );//有参构造函数
+
+                ~Socket();//析构函数
+
+                bool Bind(const std::string &,int);//2.绑定ip端口
+
+                bool Connect(const std::string &,int);//客户端请求连接服务端
+
+                bool Listen(int);//3.监听客户端
+
+                int Accept();//4.获取请求连接的客户单socket
+
+                int Send(const char *,int);//发送
+
+                int Recv(char *,int);//收取
+
+                void Close();//关闭连接
+
+};
+```
+
+##### ①创建socket与析构函数
+
+- 清空sockaddr_in结构体（主要清空zero字段）
+- 创建socket获取文件标识符（socket的创建收发信息与文件操作无异）
+
+```c++
+Socket::Socket(){
+    //创建socket，初始化m_sockfd
+        m_sockfd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if(m_sockfd == -1){
+                std::cerr<<"create socket failed"<<std::endl;
+                return;
+        }
+    //清空ipv4结构体
+        memset(&m_addr,0,sizeof(m_addr));
+        std::cout<<"socker created!"<<std::endl;
+
+}
+
+Socket::Socket(int sockfd):m_sockfd(sockfd){//有参构造需传入socket文件标识符
+//初始化ipv4结构体
+        memset(&m_addr,0,sizeof(m_addr));
+}
+
+Socket::~Socket(){
+    //关闭连接
+        Close();
+}
+```
+
+##### ②绑定ip与端口（服务端）
+
+- 初始化sockaddr_in结构体
+- bind绑定ip与端口
+
+```c++
+bool Socket::Bind(const std::string &ip,int port){
+    //初始化sockaddr_in
+
+        m_addr.sin_family = AF_INET;           // IPv4 协议族
+        m_addr.sin_port = htons(port);         // 端口号（需转为网络字节序）
+        if(ip.empty()) 
+                m_addr.sin_addr.s_addr = htonl(INADDR_ANY);//若没输入则绑定本机所有ip
+        else 
+                inet_pton(AF_INET,ip.c_str(),&m_addr.sin_addr.s_addr);//绑定指定ip
+    //绑定ip端口
+        if(bind(m_sockfd,(struct sockaddr*) &m_addr,sizeof(m_addr))== -1){
+                perror("bind failed");
+                return false;
+        }
+        else
+        {
+                return true;
+        }
+}
+```
+
+##### ③将socket设置为监听模式(服务端)
+
+```c++
+bool Socket::Listen(int backlog){
+        if(listen(m_sockfd,backlog)==-1){
+                perror("listen failed");
+                return false;
+        }
+        else{
+                std::cout<<"socket listen ......."<<std::endl;
+                return true;
+        }
+}
+```
+
+##### ④接收服务器的连接（服务端）
+
+```c++
+int Socket::Accept(){
+    
+        struct sockaddr_in c_addr;//用于存储远程客户端的ipv4
+        unsigned int addr_len = sizeof(c_addr);//用于存储远程客户端的ipv4长度
+    //获取远程客户端的socket
+        int connfd = accept(m_sockfd,(struct sockaddr*)&c_addr,&addr_len);
+        if(connfd == -1){
+                perror("accept failed");
+                return -1;
+        }
+        else{
+                char ip[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET,&c_addr.sin_addr.s_addr,ip,INET_ADDRSTRLEN);
+                std::cout<<"client:"<<ip<<":"<<ntohs(c_addr.sin_port)<<"link successful！"<<std::endl;
+                return connfd;
+        }
+}
+```
+
+##### ⑤向服务器发起连接（客户端）
+
+- 初始化远程需要连接远程服务器ipv4结构体
+- connect连接远程服务器
+
+```c++
+bool Socket::Connect(const std::string &ip,int port){
+    //初始化远程需要连接远程服务器ipv4结构体
+        m_addr.sin_family = AF_INET;           // IPv4 协议族
+        m_addr.sin_port = htons(port);         // 端口号（需转为网络字节序）
+        inet_pton(AF_INET,ip.c_str(),&m_addr.sin_addr.s_addr);//绑定指定ip
+	//连接远程服务器
+        if(connect(m_sockfd,(struct sockaddr*)&m_addr,sizeof(m_addr))==-1){
+                perror("connect failed");
+                return false;
+        }
+        else{
+                std::cout<<"server:"<<ip<<":"<<port<<"link successful!"<<std::endl;
+                return true;
+        }
+
+}
+```
+
+##### ⑥收发消息
+
+```c++
+int Socket::Send(const char* buf,int len){
+        return send(m_sockfd,buf,len,0);
+}
+
+int Socket::Recv(char* buf ,int len){
+        return  recv(m_sockfd,buf,len,0);
+```
+
+##### ⑦关闭连接
+
+```c++
+void Socket::Close(){
+        if(m_sockfd>0) close(m_sockfd);
+}
+```
+
+#### (6)服务端实现
+
+```c++
+#include"socket.h"
+#include<iostream>
+#include<cstring>
+
+
+int main(){
+    	
+		//1.创建socket
+        Socket s_socket;
+    	//2.绑定用于通信的IP地址和端口
+        if(!s_socket.Bind("0.0.0.0",8889)) return 0;
+		//3.把socket设置为监听模式
+        if(!s_socket.Listen(1024)) return 0;
+		//4.接收客户端的连接accept()"
+        int connfd = s_socket.Accept();
+		//5.发送接收数据
+        if(connfd > 0){
+
+        Socket c_socket(connfd);
+        char rbuf[1024];
+        while(true){
+                memset(rbuf, 0, sizeof(rbuf));
+                if(c_socket.Recv(rbuf,sizeof(rbuf))){
+                        std::cout<<"client: "<<rbuf<<std::endl;
+                        std::string sbuf = "ok";
+                        c_socket.Send(sbuf.c_str(),sbuf.size());
+
+                }
+
+        }
+        }
+        return 0;
+}
+```
+
+#### （7）客户端实现
+
+```c++
+#include"socket.h"
+#include<iostream>
+#include<string>
+#include<cstring>
+int main(){
+        //1.创建流式socket()
+        Socket c_socket;
+    	//2.向服务器发起连接请求connect()
+        if(c_socket.Connect("127.0.0.1",8889)){
+                std::string sbuf;
+                char rbuf[1024];
+            //3.发送接收数据send()/recv()
+                while(sbuf.compare("0")){
+                        sbuf.clear();
+                        std::cin>>sbuf;
+                        if(c_socket.Send(sbuf.c_str(),sbuf.size())){
+                                memset(rbuf,0,sizeof(rbuf));
+                                c_socket.Recv(rbuf,sizeof(rbuf));
+                                std::cout<<rbuf<<std::endl;
+                        }
+                }
+        //4.关闭socket连接，释放资源close()
+        c_socket.Close();
+        }
+        return 0;
+}
+```
+
+## 2.TCP三次握手与四次挥手
+
+### （1）三次握手
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/850de5c566ae60989f45cff4b1aad94c.png)
+
+- 客户端请求建立客户端到服务端的传输通道
+- 服务端回应服务端请求建立通道的请求，同时服务端请求建立服务端到客户端的传输通道
+- 客户端回应服务端请求建立连接的请求
+
+### （2）四次挥手
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/0dc25c2e6ae3de02cc4039553165d8cf.png)
+
+**假设客户端是请求关闭方**
+
+- 客户端请求关闭客户端到服务端的传输通道
+- 服务端回应客户端请求关闭传输通道的请求
+- 服务端请求关闭服务端到客户端的传输通道（文件传输完毕后）
+- 客户端回应服务端请求关闭传输通道的请求（等待2msl后关闭通道，确保ack发送到服务端）
+
+## 3、i/o多路复用
+
+通过一个进程 / 线程同时管理多个套接字（包括监听套接字和客户端套接字），仅在套接字有可读 / 可写事件时才进行处理，避免阻塞在单个 IO 操作上
+
+### (1)select模型
+
+select 是最早的 IO 多路复用机制，跨平台（支持 Linux、Windows 等），但存在明显的性能限制。
+
+#### 核心原理
+
+1. **事件集合**：通过三个文件描述符集合（readfds、writefds、exceptfds）分别监控 “可读”“可写”“异常” 事件（大小1024）。
+
+1. **阻塞等待**：调用 select() 后，内核阻塞等待，直到有事件就绪或超时，返回就绪的文件描述符数量。
+
+1. **遍历检查**：返回后需遍历所有文件描述符，通过 FD_ISSET() 检查哪些 fd 就绪。
+
+#### 关键限制
+
+- **文件描述符上限**：受 FD_SETSIZE 限制（默认 1024），无法直接支持高并发。
+
+- **效率低**：每次调用需将整个 fd 集合从用户态复制到内核态；返回后需遍历所有 fd 检查就绪状态，耗时随 fd 数量增加而增长。
+
+#### 核心函数
+
+| 函数原型                                                     | 作用                     | 关键参数                                                     |
+| ------------------------------------------------------------ | ------------------------ | ------------------------------------------------------------ |
+| int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout) | 阻塞等待事件就绪         | - nfds：需监控的最大 fd + 1（必须设置，否则无效）<br />- readfds/writefds/exceptfds：关注的事件集合（输入输出参数，需每次重置）<br>- timeout：超时时间（NULL` 表示永久阻塞）返回值：就绪事件数（0 表示超时，-1 表示错误） |
+| FD_ZERO(fd_set *set)                                         | 清空 fd 集合             | -                                                            |
+| FD_SET(int fd, fd_set *set)                                  | 将 fd 添加到集合         | -                                                            |
+| FD_CLR(int fd, fd_set *set)                                  | 从集合中移除 fd          | -                                                            |
+| FD_ISSET(int fd, fd_set *set)                                | 检查 fd 是否在就绪集合中 | 返回非 0 表示就绪                                            |
+
+#### 服务端实现
+
+```c++
+#include"socket.h"
+#include<iostream>
+#include<cstring>
+
+int main(){
+    int listenfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    Socket s_socket(listenfd);
+
+    if(!s_socket.Bind("0.0.0.0",8889)) return 0;
+
+    if(!s_socket.Listen(1024)) return 0;
+    /*
+    区别
+    */
+
+    fd_set read_fds;    // 关注的可读事件集合
+    fd_set all_fds;     // 保存所有需监控的 fd（避免每次重新添加）
+    int max_fd = listenfd; // 记录最大 fd,当前为listenfd（供 select 的 nfds 参数）
+
+    FD_ZERO(&all_fds);
+
+    FD_SET(listenfd, &all_fds); // 先添加监听 fd
+    
+while (1) {
+        // 每次调用 select 前需重置 read_fds（因为 select 会修改集合）
+        read_fds = all_fds;
+
+        // 阻塞等待可读事件（无超时）
+        int nfds = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
+        if (nfds == -1) { perror("select"); exit(1); }
+
+        // 遍历所有 fd，检查哪些就绪
+        for (int fd = 0; fd <= max_fd; fd++) {
+            if (!FD_ISSET(fd, &read_fds)) { continue; }
+
+            if (fd == listenfd) { // 监听 fd 就绪：新连接
+                int client_fd =s_socket.Accept();
+                if (client_fd == -1) { perror("accept"); continue; }
+
+                // 将新客户端 fd 添加到监控集合
+                FD_SET(client_fd, &all_fds);
+                if (client_fd > max_fd) { max_fd = client_fd; } // 更新最大 fd
+                printf("new client: %d\n", client_fd);
+
+            } else { // 客户端 fd 就绪：char buf[1024];
+                ssize_t n = read(fd, buf, sizeof(buf)-1);
+                if (n <= 0) { // 客户端断开或错误
+                    printf("client %d disconnected\n", fd);
+                    FD_CLR(fd, &all_fds); // 从集合中移除
+                    close(fd);
+                } else { // 处理数据
+                    buf[n] = '\0';
+                    printf("client %d: %s\n", fd, buf);
+                    // 回复客户端
+                    const char* resp = "ok";
+                    write(fd, resp, strlen(resp));
+                }
+            }
+        }
+    }
+
+
+
+    return 0;
+}
+```
+
+
+
+### (2)poll模型
+
+poll 是对 select 的改进，解决了 select 的文件描述符上限问题，但核心效率问题（用户态与内核态复制、遍历检查）仍存在。
+
+#### 核心原理
+
+1. **事件数组**：通过 struct pollfd 结构体数组管理事件，每个元素包含一个 fd 和关注的事件（无需区分读 / 写 / 异常集合）。
+
+1. **阻塞等待**：调用 poll() 后，内核阻塞等待事件就绪，返回就绪的 fd 数量。
+
+1. **遍历检查**：返回后遍历数组，通过 revents 字段检查哪些 fd 就绪（revents 是内核填充的实际发生的事件）。
+
+#### 改进与局限
+
+- **无 fd 上限**：仅受系统资源限制（理论上支持更多连接）。
+
+- **无需重置集合**：pollfd 数组可重复使用，无需像 select 那样每次清空重置。
+
+- **仍有开销**：每次调用需复制整个数组到内核态；返回后仍需遍历所有元素检查就绪状态。
+
+#### 核心函数与结构体
+
+| 结构体 / 函数                                                | 说明                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| struct pollfd { <br />       int fd; <br />       short events; <br />       short revents; <br />} | - fd：要监控的文件描述符<br />- events：关注的事件（如 POLLIN 可读、POLLOUT 可写）<br />- revents：内核返回的实际发生的事件（输出参数） |
+| int poll(struct pollfd *fds, nfds_t nfds, int timeout)       | 阻塞等待事件就绪<br />- fds：pollfd 数组<br />- nfds：数组长度<br />- timeout：超时时间（毫秒，-1 表示永久阻塞）返回值：就绪事件数（0 表示超时，-1 表示错误） |
+
+#### 服务端实现
+
+```c++
+#include "socket.h"
+#include <iostream>
+#include <cstring>
+#include <poll.h>
+
+#define MAX_CONN 1024 // 可自定义（不受固定上限限制）
+
+int main()
+{
+    int listenfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    Socket s_socket(listenfd);
+
+    if (!s_socket.Bind("0.0.0.0", 8889))
+        return 0;
+
+    if (!s_socket.Listen(1024))
+        return 0;
+
+    // 初始化 pollfd 数组（第一个元素为监听 fd）
+    struct pollfd fds[MAX_CONN];
+    memset(fds, 0, sizeof(fds));
+    fds[0].fd = listenfd;
+    fds[0].events = POLLIN; // 关注可读事件
+    int nfds = 1;           // 当前数组中有效元素数量
+
+    while (1)
+    {
+        // 阻塞等待事件（无超时）
+        int ready = poll(fds, nfds, -1);
+        if (ready == -1)
+        {
+            perror("poll");
+            exit(1);
+        }
+
+        // 遍历所有 fd，检查哪些就绪
+        for (int i = 0; i <= nfds; i++)
+        {
+            if (!(fds[i].revents & POLLIN))
+            {
+                continue;
+            } // 非可读事件跳过
+
+            if (fds[i].fd == listenfd)
+            { // 监听 fd 就绪：新连接
+              
+                int client_fd = s_socket.Accept();
+                if (client_fd == -1)
+                {
+                    perror("accept");
+                    continue;
+                }
+
+                // 检查连接数是否超过上限
+                if (nfds >= MAX_CONN)
+                {
+                    printf("too many connections, close %d\n", client_fd);
+                    close(client_fd);
+                    continue;
+                }
+
+                // 添加新客户端 fd 到 pollfd 数组
+                fds[nfds].fd = client_fd;
+                fds[nfds].events = POLLIN; // 关注可读事件
+                nfds++;
+                printf("new client: %d (total: %d)\n", client_fd, nfds - 1);
+            }
+            else
+            { // 客户端 fd 就绪：有数据可读
+                int client_fd = fds[i].fd;
+                char buf[1024];
+                ssize_t n = read(client_fd, buf, sizeof(buf) - 1);
+                if (n <= 0)
+                { // 客户端断开或错误
+                  // 移除该 fd（用最后一个元素覆盖，减少数组移动）
+                    fds[i] = fds[nfds - 1];
+                    nfds--;
+                    i--; // 回退索引，避免跳过元素
+                    close(client_fd);
+                }
+                else
+                { // 处理数据
+                    buf[n] = '\0';
+                    printf("client %d: %s\n", client_fd, buf);
+                    // 回复客户端
+                    const char *resp = "ok";
+                    write(client_fd, resp, strlen(resp));
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+```
+
+
+
+### （3）epoll模型
+
+epoll 是 Linux 为高并发场景设计的 IO 多路复用机制，性能远超 select 和 poll，是解决 “C10K 问题” 的核心技术。
+
+#### 核心原理
+
+1. **事件表**：内核维护一个 “事件表”（通过 epoll_create() 创建），用于存储用户关注的 fd 和事件。
+2. **事件注册**：通过 epoll_ctl() 向事件表添加 / 修改 / 删除 fd 及关注的事件（一次注册，多次使用）。
+3. **就绪列表**(重要区别)：内核主动将就绪的事件放入 “就绪列表epoll_event[]”，epoll_wait() 直接返回就绪列表中的事件，无需遍历所有 fd。
+4. **高效机制**：通过内存映射（mmap）避免用户态与内核态的数据复制，仅处理就绪事件，效率极高。
+
+#### 关键模式
+
+- **水平触发（LT，默认）**：只要 fd 缓冲区有未处理数据，epoll_wait() 就持续通知（适合新手，编程简单）。
+
+- **边缘触发（ET）**：仅在 fd 状态变化时通知一次（如从不可读到可读），需一次性处理完所有数据（配合非阻塞 IO，效率更高，编程复杂）。
+
+#### 核心函数 
+
+| 函数原型                                                     | 作用                      | 关键参数                                                     |
+| ------------------------------------------------------------ | ------------------------- | ------------------------------------------------------------ |
+| int epoll_create(int size)                                   | 创建 epoll 实例（事件表） | size：早期需 >0（现在忽略），返回 epoll 描述符（epfd）       |
+| int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event) | 管理事件表                | - op：EPOLL_CTL_ADD（添加）、EPOLL_CTL_MOD（修改）、EPOLL_CTL_DEL（删除）<br />- event：struct epoll_event（events 为关注的事件，data.fd 为关联的 fd） |
+| int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout) | 等待就绪事件              | - events：输出就绪事件的数组<br />- maxevents：数组最大长度<br />- timeout：超时时间（毫秒，-1 表示永久阻塞）返回值：就绪事件数（0 表示超时，-1 表示错误） |
+| struct epoll_event { <br />        uint32_t events; <br />        epoll_data_t data; <br />} | 事件结构体                | - events：关注的事件（如 EPOLLIN 可读、EPOLLOUT 可写）<br />- data：关联的数据（通常用 data.fd 存储 fd） |
+
+#### 服务端实现（epoll LT 模式）
+
+```c++
+#include "socket.h"
+#include <iostream>
+#include <cstring>
+#include <sys/epoll.h>
+#define MAX_EVENTS 1024
+
+int main()
+{
+    int listenfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    Socket s_socket(listenfd);
+
+    if (!s_socket.Bind("0.0.0.0", 8889))
+        return 0;
+
+    if (!s_socket.Listen(1024))
+        return 0;
+
+    // 4. 创建 epoll 实例
+    int epfd = epoll_create(1); // 参数忽略
+    if (epfd == -1)
+    {
+        perror("epoll_create");
+        exit(1);
+    }
+
+    // 5. 向 epoll 注册监听 fd（关注可读事件，LT 模式默认）
+    struct epoll_event ev;
+    ev.events = EPOLLIN; // 水平触发：有数据就通知
+    ev.data.fd = listenfd;
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev) == -1)
+    {
+        perror("epoll_ctl add listen_fd");
+        exit(1);
+    }
+    struct epoll_event events[MAX_EVENTS]; // 存放就绪事件
+
+    while (1)
+    {
+        int nfds = epoll_wait(epfd, events, MAX_EVENTS, -1);
+        if (nfds == -1)
+        {
+            perror("epoll_wait");
+            exit(1);
+        }
+
+        // 处理就绪fd
+        for (int i = 0; i <= nfds; i++)
+        {
+            int fd = events[i].data.fd;
+            if (fd == listenfd)
+            { // 监听 fd 就绪：新连接
+                int client_fd = s_socket.Accept();
+                if (client_fd == -1)
+                {
+                    perror("accept");
+                    continue;
+                }
+
+                // 将新客户端 fd 添加到监控集合
+                struct epoll_event new_ev;
+                new_ev.events = EPOLLIN; // 水平触发：有数据就通知
+                new_ev.data.fd = client_fd;
+                if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_fd, &ev) == -1)
+                {
+                    perror("epoll_ctl add client_fd");
+                    close(client_fd);
+                }
+                printf("new client: %d\n", client_fd);
+            }
+            else
+            { // 客户端 fd 就绪：有数据可读
+                char buf[1024];
+                ssize_t n = read(fd, buf, sizeof(buf) - 1);
+                if (n <= 0)
+                { // 客户端断开或错误
+                    printf("client %d disconnected\n", i);
+                    epoll_ctl(epfd, EPOLL_CTL_ADD, fd, NULL);
+                    close(fd);
+                }
+                else
+                { //  处理数据（LT 模式可分多次读）
+                    buf[n] = '\0';
+                    printf("client %d: %s\n", i, buf);
+                    // 回复客户端
+                    const char *resp = "ok";
+                    write(i, resp, strlen(resp));
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+```
 
 
 
@@ -2513,3 +4745,162 @@ suspend-then-hibernate 先使系统休眠，间隔指定时间后唤醒并转入
 --drop-in = 名称 使用指定名称的补充配置文件（drop-in file）编辑单元文件
 
 --when = 时间 按指定时间戳，计划执行关机 / 断电 / 重启 /kexec 操作
+
+## 3、ssh连接远程服务器
+
+### (1)ssh服务安装
+
+```shell
+#ubuntu-linux
+sudo yum install openssh-server
+
+#其他ubuntu-linux
+sudo apt install openssh-server
+```
+
+### （2）linux服务端启动ssh
+
+```shell
+sudo systemctl start ssh
+#或者
+sudo systemctl start sshd
+```
+
+### （3）俩种连接方式
+
+#### ①**使用密钥认证**
+
+生成密钥对
+
+```shell
+ssh-keygen -t rsa
+```
+
+执行完上述命令后，一路回车，会默认保存公钥，和密钥
+
+- 公钥：id_rsa.pub
+- 密钥：id_rsa
+
+将id_rsa.pub的内容**追加**到服务器的~/.ssh/authorized_keys的文件中（**一定要是追加，另起一行后粘贴**）
+
+之后在其他命令窗口执行以下命令即可
+
+```shell
+ssh username@ipv4 
+```
+
+- username：服务器上要登陆的用户名
+- ipv4：服务器公网地址
+
+
+
+**如何实现快捷连接服务器:**
+
+在终端目录下的.ssh/config中编写如下格式内容：
+
+```txt
+Host 别名
+    HostName 服务器IP或域名  # 必选，服务器的IP地址或域名
+    User 登录用户名          # 必选，登录服务器的用户名（如 admin）
+    Port 端口号              # 可选，默认22，非默认端口需指定（如 195185）
+    IdentityFile 密钥路径    # 可选，指定私钥路径（如 ~/.ssh/id_rsa），适合公钥认证
+    # 其他可选参数（按需添加）
+    # ForwardAgent yes      # 代理转发（跨服务器跳转时用）
+    # Compression yes       # 启用压缩传输
+```
+
+示例
+
+```txt
+Host linux
+	Hostname 192.168.0.1
+	User root
+```
+
+那么命令行中执行以下命令即可连接到服务器
+
+```shell
+ssh linux
+```
+
+
+
+#### ②无密匙登陆
+
+需修改`/etc/ssh/sshd_config`文件的配置,拉到最下面
+
+```
+# override default of no subsystems
+Subsystem sftp  /usr/libexec/openssh/sftp-server
+
+# Example of overriding settings on a per-user basis
+#Match User anoncvs
+#       X11Forwarding no
+#       AllowTcpForwarding no
+#       PermitTTY no
+#       ForceCommand cvs server
+
+UseDNS no
+SyslogFacility AUTHPRIV
+PermitRootLogin yes
+#将下面修改为yes
+PasswordAuthentication yes ##############     需要修改的行     ################
+```
+
+将`PasswordAuthentication`后的选项修改为yes(默认为no)即可
+
+连接服务器时执行以下命令,按系统提示输入用户密码即可
+
+```shell
+ssh username@ipv4 
+```
+
+#### ③vscode通过ssh连接远程服务器
+
+- 安装拓展“Remote - SSH”
+- shift+ctrl+p打开vscode命令行
+- 选择Remote-SSH: Connect to Host...
+- 选择添加新的ssh主机（或者在默认终端配置文件步骤如**①使用密钥认证：如何实现快捷连接服务器**）
+- 输入ssh username@ipv4即可绑定
+
+
+
+```c++
+int sockfd = socket(AF_INET,SOCK_STREAM,0);
+        if(sockfd > 0) std::cout<<"1.创建socket成功"<<std::endl;
+        else return 0;
+        struct sockaddr_in s_addr;
+
+        std::string ip = "127.0.0.1";
+        int port = 8889;
+        memset(&s_addr,0,sizeof(s_addr));
+        s_addr.sin_family = AF_INET;           // IPv4 协议族 
+        s_addr.sin_port = htons(8889);         // 端口号（需转为网络字节序） 
+        inet_pton(AF_INET,ip.c_str(),&s_addr.sin_addr.s_addr);//绑定指定ip 
+        if(bind(sockfd,(struct sockaddr*) &s_addr,sizeof(s_addr)) <0 ){
+                std::cerr<<"bind failed!"<<std::endl;
+                return 0;
+        }
+        return 0;
+
+int server_fd;               // 服务器监听socket
+        struct sockaddr_in address;  // 地址结构
+        int addrlen = sizeof(address);
+
+        if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("socket creation failed");  // 错误处理
+        exit(EXIT_FAILURE);
+        }
+
+        address.sin_family = AF_INET;
+        std::string ip = "127.0.0.1";
+
+        inet_pton(AF_INET,ip.c_str(),&address.sin_addr.s_addr);
+        address.sin_port = htons(8889);        // 端口转换为网络字节序
+        if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
+        }
+
+```
+
